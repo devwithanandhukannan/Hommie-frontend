@@ -6,6 +6,7 @@ import { useAuth, useData } from '@/lib/auth';
 import { Icon, Sheet, Btn, Badge } from '@/components/ui';
 import { applyTheme, getSavedTheme } from '@/lib/theme';
 import PermissionsPrompt from '@/components/PermissionsPrompt';
+import PwaInstallPrompt from '@/components/PwaInstallPrompt';
 
 const NAV = [
   ['/dashboard', 'nav.home', 'home'], ['/calendar', 'nav.calendar', 'calendar'], ['/tasks', 'nav.tasks', 'tasks'], ['/bills', 'nav.bills', 'bills'], ['/money', 'nav.money', 'money'],
@@ -42,7 +43,7 @@ function FamilySwitcher({ onClose }) {
                     flexShrink: 0,
                   }}
                 >
-                  <img src="/icon.svg" alt="Family" width="24" height="24" style={{ objectFit: 'contain' }} />
+                  <img src="/icon.svg?v=2" alt="Family" width="24" height="24" style={{ objectFit: 'contain' }} />
                 </span>
                 <div><div className="bold">{f.name}</div><div className="small muted">{f.myRole} · {f.memberCount} member{f.memberCount === 1 ? '' : 's'}</div></div>
               </div>
@@ -96,7 +97,7 @@ export default function Shell({ children }) {
           flexShrink: 0,
         }}
       >
-        <img src="/icon.svg" alt="Home" width="22" height="22" style={{ objectFit: 'contain' }} />
+        <img src="/icon.svg?v=2" alt="Home" width="22" height="22" style={{ objectFit: 'contain' }} />
       </span>
       <span style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{family?.name || 'Family'}</span>
       <Icon name="swap" size={16} />
@@ -195,6 +196,7 @@ export default function Shell({ children }) {
       </div>
       {open ? <FamilySwitcher onClose={() => setOpen(false)} /> : null}
       <PermissionsPrompt />
+      <PwaInstallPrompt />
     </div>
   );
 }

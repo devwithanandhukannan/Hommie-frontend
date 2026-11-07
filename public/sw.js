@@ -1,12 +1,12 @@
 /* Hommi service worker: offline shell, safe read-only API cache, web push. */
-const STATIC = 'fh-static-v1';
+const STATIC = 'fh-static-v2';
 const API = 'fh-api-v1';
 const OFFLINE_URL = '/offline.html';
 // Only these lists are cached for offline reading. Documents, chat, medicine, attachments and money are never cached.
 const CACHEABLE_API = /^\/api\/(dashboard|tasks|grocery|meals|recipes|bills|bill-instances|special-dates|guests|contacts)(\/|\?|$)/;
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(STATIC).then((c) => c.addAll([OFFLINE_URL, '/icon-192.png'])).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(STATIC).then((c) => c.addAll([OFFLINE_URL, '/icon-192.png', '/favicon.ico', '/favicon.svg', '/icon.svg'])).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -37,7 +37,20 @@ self.addEventListener('fetch', (e) => {
   }
   if (url.pathname.startsWith('/api/')) return; // everything else goes straight to the network
 
-  if (url.pathname.startsWith('/_next/static/') || /\.(png|svg|ico|webmanifest)$/.test(url.pathname)) {
+  if (/\.(png|svg|ico|webmanifest)$/.test(url.pathname)) {
+    e.respondWith(
+      fetch(req).then((res) => {
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(STATIC).then((c) => c.put(req, copy));
+        }
+        return res;
+      }).catch(async () => (await caches.open(STATIC).then((c) => c.match(req))))
+    );
+    return;
+  }
+
+  if (url.pathname.startsWith('/_next/static/')) {
     e.respondWith(caches.open(STATIC).then(async (c) => (await c.match(req)) || fetch(req).then((res) => { if (res.ok) c.put(req, res.clone()); return res; })));
     return;
   }

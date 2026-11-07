@@ -2647,3 +2647,65 @@ html[data-theme='light'] .toast {
   justify-content: center;
   flex-shrink: 0;
 }
+
+/* PWA Install Prompt (Apple-style Bottom Sheet) */
+.pwa-install-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 9998;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease-out;
+}
+.pwa-install-card {
+  width: 100%;
+  max-width: 440px;
+  padding: 22px;
+  border-radius: 26px;
+  background: var(--card);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+  animation: appleFadeUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-bottom: max(12px, env(safe-area-inset-bottom));
+}
+.pwa-ios-guide {
+  background: var(--surface-2);
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pwa-ios-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+.pwa-step-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.pwa-inline-icon {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  margin: 0 2px;
+}
+

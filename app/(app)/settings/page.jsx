@@ -326,6 +326,34 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* PWA Mobile App Section */}
+        <section className="card col" style={{ padding: 22, borderRadius: 20 }}>
+          <div className="row between" style={{ alignItems: 'center' }}>
+            <div className="row" style={{ gap: 14 }}>
+              <img
+                src="/apple-touch-icon.png?v=2"
+                alt="Hommi App"
+                width={44}
+                height={44}
+                style={{ borderRadius: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+              />
+              <div>
+                <div className="bold small">Hommi on your Mobile Phone</div>
+                <div className="tiny muted">Install as a full-screen app on your Home Screen</div>
+              </div>
+            </div>
+            <Btn
+              tone="brand"
+              size="sm"
+              onClick={() => {
+                window.dispatchEvent(new Event('open-pwa-install'));
+              }}
+            >
+              Install App
+            </Btn>
+          </div>
+        </section>
+
         {/* 4. Account Settings */}
         <section className="card col" style={{ padding: 22, borderRadius: 20 }}>
           <div>
