@@ -1,16 +1,11 @@
 export function AuthCard({ title, sub, children }) {
   return (
-    <div className="auth">
-      <div className="card" style={{ maxWidth: 420, width: '100%', padding: '36px 32px', borderRadius: 20 }}>
-        <div style={{ textAlign: 'center', marginBottom: 20 }}>
-          <div className="font-serif" style={{ fontSize: 36, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text)' }}>
-            Hommi
-          </div>
-        </div>
-        <h1 style={{ fontSize: 20, textAlign: 'center' }}>{title}</h1>
-        <p className="muted" style={{ margin: '6px 0 24px', textAlign: 'center', fontSize: 13.5 }}>{sub}</p>
-        {children}
+    <div className="auth"><div className="card">
+      <div className="logo" style={{ background: 'transparent', width: 56, height: 56, borderRadius: 0, padding: 0, marginBottom: 12 }}>
+        <img src="/icon.svg?v=2" alt="Hommi" width="56" height="56" style={{ display: 'block', objectFit: 'contain' }} />
       </div>
-    </div>
+      <h1>{title}</h1><p className="muted" style={{ margin: '4px 0 16px' }}>{sub}</p>
+      {children}
+    </div></div>
   );
 }
