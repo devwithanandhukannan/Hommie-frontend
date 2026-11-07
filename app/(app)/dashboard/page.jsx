@@ -15,6 +15,11 @@ export default function Dashboard() {
   const [aiOpen, setAiOpen] = useState(false);
   const [promptText, setPromptText] = useState('');
 
+  // 1. All hooks called unconditionally at top of component
+  const hour = new Date().getHours();
+  const greetingWord = hour < 12 ? 'Good morning,' : hour < 17 ? 'Good afternoon,' : 'Good evening,';
+  const firstName = user?.name ? user.name.split(' ')[0] : 'Anandhu';
+
   // Date formatting for header: e.g. "SATURDAY · 7 NOVEMBER"
   const dateHeading = useMemo(() => {
     const now = new Date();
@@ -23,15 +28,24 @@ export default function Dashboard() {
     return `${days[now.getDay()]} · ${now.getDate()} ${months[now.getMonth()]}`;
   }, []);
 
-  // Greeting based on hour
-  const hour = new Date().getHours();
-  const greetingWord = hour < 12 ? 'Good morning,' : hour < 17 ? 'Good afternoon,' : 'Good evening,';
-  const firstName = user?.name ? user.name.split(' ')[0] : 'Anandhu';
+  // Activities list
+  const recentActivities = useMemo(() => {
+    if (auditData.data?.length) {
+      return auditData.data.slice(0, 5).map((a) => {
+        const timeStr = new Date(a.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: false });
+        let text = `${a.actor?.displayName || 'Someone'} ${a.action}`;
+        if (a.entity) text += ` ${a.entity}`;
+        return { id: a.id, text, time: timeStr };
+      });
+    }
+    return [
+      { id: '1', text: `${firstName} bought Basmati Rice`, time: '6:07' },
+      { id: '2', text: 'Green Chilli added to shopping', time: '6:06' },
+      { id: '3', text: 'Bathroom cleaning added', time: '5:17' },
+    ];
+  }, [auditData.data, firstName]);
 
-  if (loading && !d) return <Spinner />;
-  if (error && !d) return <ErrorNote error={error} />;
-
-  // Data helpers
+  // 2. Data helpers with graceful fallbacks
   const primaryTask = d?.myTasks?.[0] || {
     id: 'sample-task',
     title: 'Cook Chicken Mandi for lunch',
@@ -70,23 +84,6 @@ export default function Dashboard() {
       }
       reload();
     }, 'Recorded as taken');
-
-  // Activities list
-  const recentActivities = useMemo(() => {
-    if (auditData.data?.length) {
-      return auditData.data.slice(0, 5).map((a) => {
-        const timeStr = new Date(a.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: false });
-        let text = `${a.actor?.displayName || 'Someone'} ${a.action}`;
-        if (a.entity) text += ` ${a.entity}`;
-        return { id: a.id, text, time: timeStr };
-      });
-    }
-    return [
-      { id: '1', text: `${firstName} bought Basmati Rice`, time: '6:07' },
-      { id: '2', text: 'Green Chilli added to shopping', time: '6:06' },
-      { id: '3', text: 'Bathroom cleaning added', time: '5:17' },
-    ];
-  }, [auditData.data, firstName]);
 
   return (
     <div className="editorial-layout">
