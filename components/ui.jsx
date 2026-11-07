@@ -5,8 +5,59 @@ import { translate, translateToast } from '@/lib/i18n';
 
 const getAppLang = () => (typeof window !== 'undefined' && window.localStorage?.getItem('fh_lang')) || 'en';
 
+export function formatErrorMessage(error) {
+  if (!error) return null;
+  const raw = typeof error === 'string' ? error : error?.message || String(error || '');
+  if (!raw || raw === '[object Object]') {
+    return 'An unexpected error occurred. Please try again.';
+  }
+
+  // Detect raw HTML responses (e.g. <!DOCTYPE html>, <html, <body>, <title>)
+  const isHtml = /<!doctype|<html|<body|<div|<title|<head|<style|<script/i.test(raw);
+
+  // Detect gateway/proxy cold-start status codes or messages
+  const isColdStartOrGateway =
+    /\b(502|503|504)\b/.test(raw) ||
+    /bad gateway/i.test(raw) ||
+    /gateway timeout/i.test(raw) ||
+    /service unavailable/i.test(raw) ||
+    /failed to fetch csrf token/i.test(raw);
+
+  if (isHtml || isColdStartOrGateway) {
+    return 'The server is waking up or temporarily unavailable. Please try again in a few moments.';
+  }
+
+  // Detect network/connectivity failures
+  if (/failed to fetch|networkerror|load failed|err_connection_refused/i.test(raw)) {
+    return 'Unable to connect to the server. Please check your internet connection or try again in a moment.';
+  }
+
+  // Strip any stray HTML tags and clean whitespace
+  const clean = raw.replace(/<[^>]*>?/gm, '').replace(/\s+/g, ' ').trim();
+
+  // Truncate overly long technical dumps / stack traces
+  if (clean.length > 200) {
+    return clean.slice(0, 197) + '…';
+  }
+
+  return clean;
+}
+
 export const Spinner = () => <div className="spinner" role="status" aria-label="Loading" />;
-export const ErrorNote = ({ error }) => (error ? <div className="err" role="alert">{error.message || String(error)}</div> : null);
+export const ErrorNote = ({ error }) => {
+  const msg = formatErrorMessage(error);
+  if (!msg) return null;
+  return (
+    <div className="err" role="alert" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }} aria-hidden="true">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="8" x2="12" y2="12" />
+        <line x1="12" y1="16" x2="12.01" y2="16" />
+      </svg>
+      <span style={{ wordBreak: 'break-word', lineHeight: 1.45 }}>{msg}</span>
+    </div>
+  );
+};
 export const Empty = ({ children }) => <div className="empty">{children}</div>;
 export const Badge = ({ tone = '', children }) => <span className={`badge ${tone}`}>{children}</span>;
 
@@ -96,8 +147,9 @@ export function ToastProvider({ children }) {
   const timerRef = useRef(null);
 
   const push = useCallback((text, bad = false) => {
+    const clean = bad ? (formatErrorMessage(text) || text) : text;
     const lang = getAppLang();
-    const localized = translateToast(text, lang);
+    const localized = translateToast(clean, lang);
     const id = Date.now() + Math.random();
     setItems([{ id, text: localized, bad }]);
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -269,7 +321,7 @@ export function useAction() {
   const [busy, setBusy] = useState(false);
   const run = useCallback(async (fn, okMsg) => {
     setBusy(true);
-    try { const r = await fn(); if (okMsg) toast(okMsg); return r ?? true; } catch (e) { toast(e.message || 'Something went wrong', true); return false; } finally { setBusy(false); }
+    try { const r = await fn(); if (okMsg) toast(okMsg); return r ?? true; } catch (e) { toast(formatErrorMessage(e) || 'Something went wrong', true); return false; } finally { setBusy(false); }
   }, [toast]);
   return [run, busy];
 }

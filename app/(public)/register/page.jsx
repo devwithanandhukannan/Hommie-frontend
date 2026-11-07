@@ -1,8 +1,8 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { post } from '@/lib/api';
+import { useState, useEffect } from 'react';
+import { post, prefetchCsrf } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { AuthCard } from '@/components/AuthCard';
 import { Field, Input, Btn, ErrorNote, useToast } from '@/components/ui';
@@ -11,6 +11,10 @@ export default function Register() {
   const { signIn } = useAuth();
   const router = useRouter();
   const toast = useToast();
+
+  useEffect(() => {
+    prefetchCsrf();
+  }, []);
 
   const [step, setStep] = useState('details'); // 'details' | 'otp'
   const [f, setF] = useState({ name: '', email: '', password: '' });

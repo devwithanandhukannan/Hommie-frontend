@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
+import { prefetchCsrf } from '@/lib/api';
 import { AuthCard } from '@/components/AuthCard';
 import { Field, Input, Btn, ErrorNote } from '@/components/ui';
 
@@ -13,6 +14,11 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    prefetchCsrf();
+  }, []);
+
   useEffect(() => { if (status === 'authed') router.replace(families.length ? '/dashboard' : '/onboarding'); }, [status, families, router]);
   const submit = async (e) => {
     e.preventDefault(); setBusy(true); setError(null);

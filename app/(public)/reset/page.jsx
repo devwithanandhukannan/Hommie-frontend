@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, Suspense } from 'react';
-import { post } from '@/lib/api';
+import { post, prefetchCsrf } from '@/lib/api';
 import { AuthCard } from '@/components/AuthCard';
 import { Field, Input, Btn, ErrorNote, useToast } from '@/components/ui';
 
@@ -10,6 +10,10 @@ function ResetContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const toast = useToast();
+
+  useEffect(() => {
+    prefetchCsrf();
+  }, []);
 
   const urlToken = searchParams?.get('token') || '';
   const urlEmail = searchParams?.get('email') || '';
