@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useAuth, useData } from '@/lib/auth';
 import { Icon, Sheet, Btn, Badge } from '@/components/ui';
 import { applyTheme, getSavedTheme } from '@/lib/theme';
+import PermissionsPrompt from '@/components/PermissionsPrompt';
 
 const NAV = [
   ['/dashboard', 'nav.home', 'home'], ['/calendar', 'nav.calendar', 'calendar'], ['/tasks', 'nav.tasks', 'tasks'], ['/bills', 'nav.bills', 'bills'], ['/money', 'nav.money', 'money'],
@@ -193,6 +194,7 @@ export default function Shell({ children }) {
         </nav>
       </div>
       {open ? <FamilySwitcher onClose={() => setOpen(false)} /> : null}
+      <PermissionsPrompt />
     </div>
   );
 }

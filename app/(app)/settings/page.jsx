@@ -2,9 +2,10 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { patch } from '@/lib/api';
-import { PageHeader, Btn, Field, Input, Icon, Spinner, useAction, useToast } from '@/components/ui';
+import { PageHeader, Btn, Field, Input, Icon, Spinner, Switch, useAction, useToast } from '@/components/ui';
 import { applyTheme, getSavedTheme } from '@/lib/theme';
 import { languages } from '@/lib/i18n';
+import { getAllPermissions, requestMicrophone, requestCamera, requestNotifications } from '@/lib/permissions';
 
 export default function SettingsPage() {
   const { user, setUser, t, setLang, lang, signOut } = useAuth();
@@ -17,6 +18,9 @@ export default function SettingsPage() {
   // Language state: 'en' | 'hi' | 'ta' | 'ml'
   const [langPref, setLangPref] = useState(lang || 'en');
 
+  // Permissions state
+  const [perms, setPerms] = useState({ microphone: 'prompt', camera: 'prompt', notifications: 'prompt' });
+
   // User name edit state
   const [name, setName] = useState('');
 
@@ -24,7 +28,53 @@ export default function SettingsPage() {
     setThemePref(getSavedTheme());
     setLangPref(lang || user?.language || 'en');
     setName(user?.name || '');
+    getAllPermissions().then(setPerms).catch(() => {});
   }, [user, lang]);
+
+  const toggleMicrophone = async () => {
+    if (perms.microphone === 'granted') {
+      toast('To revoke permission, reset it in your browser address bar settings (🔒 icon).');
+      return;
+    }
+    try {
+      const res = await requestMicrophone();
+      setPerms((prev) => ({ ...prev, microphone: res }));
+      if (res === 'granted') toast('Microphone access enabled');
+      else toast('Microphone access blocked in browser');
+    } catch {
+      toast('Microphone unavailable or blocked');
+    }
+  };
+
+  const toggleCamera = async () => {
+    if (perms.camera === 'granted') {
+      toast('To revoke permission, reset it in your browser address bar settings (🔒 icon).');
+      return;
+    }
+    try {
+      const res = await requestCamera();
+      setPerms((prev) => ({ ...prev, camera: res }));
+      if (res === 'granted') toast('Camera access enabled');
+      else toast('Camera access blocked in browser');
+    } catch {
+      toast('Camera unavailable or blocked');
+    }
+  };
+
+  const toggleNotifications = async () => {
+    if (perms.notifications === 'granted') {
+      toast('To revoke notifications, reset it in your browser address bar settings (🔒 icon).');
+      return;
+    }
+    try {
+      const res = await requestNotifications();
+      setPerms((prev) => ({ ...prev, notifications: res }));
+      if (res === 'granted') toast('Notifications enabled');
+      else toast('Notifications blocked in browser');
+    } catch {
+      toast('Notifications unavailable or blocked');
+    }
+  };
 
   const selectTheme = (newTheme) => {
     setThemePref(newTheme);
@@ -195,7 +245,88 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* 3. Account Settings */}
+        {/* 3. Permissions & Privacy (Apple-styled Settings Rows) */}
+        <section className="card col" style={{ padding: 22, borderRadius: 20 }}>
+          <div>
+            <h2 style={{ fontSize: 16, margin: '0 0 4px' }}>{t('settings.permissions')}</h2>
+            <p className="small muted" style={{ margin: 0 }}>
+              {t('settings.permissions_desc')}
+            </p>
+          </div>
+
+          <div className="col" style={{ gap: 0, marginTop: 12, background: 'var(--surface-2)', borderRadius: 16, overflow: 'hidden' }}>
+            {/* Microphone Row */}
+            <div className="row between" style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)' }}>
+              <div className="row" style={{ gap: 12 }}>
+                <span className="setting-perm-icon" style={{ background: 'rgba(52, 199, 89, 0.15)', color: '#34C759' }}>
+                  <Icon name="mic" size={18} />
+                </span>
+                <div>
+                  <div className="bold small">{t('settings.microphone')}</div>
+                  <div className="tiny muted">{t('settings.microphone_desc')}</div>
+                </div>
+              </div>
+              <div className="row" style={{ gap: 10 }}>
+                <span className={`tiny bold ${perms.microphone === 'granted' ? 'color-ok' : perms.microphone === 'denied' ? 'color-danger' : 'muted'}`}>
+                  {perms.microphone === 'granted' ? t('settings.status_allowed') : perms.microphone === 'denied' ? t('settings.status_blocked') : t('settings.status_not_set')}
+                </span>
+                <Switch
+                  checked={perms.microphone === 'granted'}
+                  onChange={toggleMicrophone}
+                  ariaLabel={t('settings.microphone')}
+                />
+              </div>
+            </div>
+
+            {/* Camera Row */}
+            <div className="row between" style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)' }}>
+              <div className="row" style={{ gap: 12 }}>
+                <span className="setting-perm-icon" style={{ background: 'rgba(0, 113, 227, 0.15)', color: '#0071E3' }}>
+                  <Icon name="photo" size={18} />
+                </span>
+                <div>
+                  <div className="bold small">{t('settings.camera')}</div>
+                  <div className="tiny muted">{t('settings.camera_desc')}</div>
+                </div>
+              </div>
+              <div className="row" style={{ gap: 10 }}>
+                <span className={`tiny bold ${perms.camera === 'granted' ? 'color-ok' : perms.camera === 'denied' ? 'color-danger' : 'muted'}`}>
+                  {perms.camera === 'granted' ? t('settings.status_allowed') : perms.camera === 'denied' ? t('settings.status_blocked') : t('settings.status_not_set')}
+                </span>
+                <Switch
+                  checked={perms.camera === 'granted'}
+                  onChange={toggleCamera}
+                  ariaLabel={t('settings.camera')}
+                />
+              </div>
+            </div>
+
+            {/* Notifications Row */}
+            <div className="row between" style={{ padding: '14px 16px' }}>
+              <div className="row" style={{ gap: 12 }}>
+                <span className="setting-perm-icon" style={{ background: 'rgba(255, 149, 0, 0.15)', color: '#FF9500' }}>
+                  <Icon name="bell" size={18} />
+                </span>
+                <div>
+                  <div className="bold small">{t('settings.notifications')}</div>
+                  <div className="tiny muted">{t('settings.notifications_desc')}</div>
+                </div>
+              </div>
+              <div className="row" style={{ gap: 10 }}>
+                <span className={`tiny bold ${perms.notifications === 'granted' ? 'color-ok' : perms.notifications === 'denied' ? 'color-danger' : 'muted'}`}>
+                  {perms.notifications === 'granted' ? t('settings.status_allowed') : perms.notifications === 'denied' ? t('settings.status_blocked') : t('settings.status_not_set')}
+                </span>
+                <Switch
+                  checked={perms.notifications === 'granted'}
+                  onChange={toggleNotifications}
+                  ariaLabel={t('settings.notifications')}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 4. Account Settings */}
         <section className="card col" style={{ padding: 22, borderRadius: 20 }}>
           <div>
             <h2 style={{ fontSize: 16, margin: '0 0 4px' }}>{t('settings.account')}</h2>

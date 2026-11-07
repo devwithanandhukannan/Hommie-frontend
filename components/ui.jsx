@@ -32,6 +32,22 @@ export function Field({ label, children, hint }) {
 export const Input = (p) => <input {...p} className={`input ${p.className || ''}`} />;
 export const Select = ({ children, ...p }) => <select {...p} className={`select ${p.className || ''}`}>{children}</select>;
 
+export function Switch({ checked, onChange, disabled = false, ariaLabel }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={Boolean(checked)}
+      aria-label={ariaLabel}
+      disabled={disabled}
+      className={`apple-toggle ${checked ? 'on' : ''}`}
+      onClick={() => !disabled && onChange && onChange(!checked)}
+    >
+      <span className="apple-toggle-thumb" />
+    </button>
+  );
+}
+
 export function Tabs({ value, onChange, items }) {
   return (
     <div className="tabs" role="tablist">
