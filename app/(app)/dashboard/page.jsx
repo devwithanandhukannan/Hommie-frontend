@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { post } from '@/lib/api';
 import { useAuth, useData } from '@/lib/auth';
 import ChatPanel from '@/components/ChatPanel';
-import { Badge, Btn, Empty, ErrorNote, Field, Input, Sheet, Spinner, useAction } from '@/components/ui';
+import { Avatar, Badge, Btn, Empty, ErrorNote, Field, Icon, Input, Sheet, Spinner, useAction } from '@/components/ui';
 import { CATEGORY_LABEL, daysLabel, rupees, shortDate, toPaise } from '@/lib/format';
 
 function AmountSheet({ inst, onClose, onDone }) {
@@ -27,7 +27,7 @@ function AmountSheet({ inst, onClose, onDone }) {
 }
 
 export default function Dashboard() {
-  const { t, family, user } = useAuth();
+  const { t, family, user, members } = useAuth();
   const { data: d, error, loading, reload } = useData('/dashboard', { interval: 60000 });
   const [run] = useAction();
   const [amountFor, setAmountFor] = useState(null);
@@ -106,6 +106,70 @@ export default function Dashboard() {
             {d.todayMeals.length === 0 ? <p className="muted small" style={{ margin: 0 }}>{t('dash.no_meals')}</p> : ['morning', 'noon', 'night'].map((s) => { const m = d.todayMeals.find((x) => x.slot === s); return m ? <p key={s} style={{ margin: '0 0 4px' }}><b style={{ textTransform: 'capitalize' }}>{s}</b>: {m.items.join(', ') || '—'}</p> : null; })}
           </section>
         </div>
+
+        <section className="card" aria-label="Quick Actions">
+          <div className="row between" style={{ marginBottom: 12 }}>
+            <h2>{t('dash.quick_actions')}</h2>
+          </div>
+          <div className="quick-actions-grid">
+            <Link href="/tasks" className="quick-action-btn">
+              <span className="quick-action-icon" style={{ background: 'rgba(0, 113, 227, 0.12)', color: 'var(--info)' }}>
+                <Icon name="tasks" size={20} />
+              </span>
+              <span>{t('nav.tasks')}</span>
+            </Link>
+            <Link href="/money" className="quick-action-btn">
+              <span className="quick-action-icon" style={{ background: 'rgba(255, 149, 0, 0.12)', color: 'var(--warn)' }}>
+                <Icon name="money" size={20} />
+              </span>
+              <span>{t('nav.money')}</span>
+            </Link>
+            <Link href="/grocery" className="quick-action-btn">
+              <span className="quick-action-icon" style={{ background: 'rgba(52, 199, 89, 0.12)', color: 'var(--ok)' }}>
+                <Icon name="grocery" size={20} />
+              </span>
+              <span>{t('nav.grocery')}</span>
+            </Link>
+            <Link href="/meals" className="quick-action-btn">
+              <span className="quick-action-icon" style={{ background: 'rgba(175, 82, 222, 0.12)', color: '#AF52DE' }}>
+                <Icon name="meals" size={20} />
+              </span>
+              <span>{t('nav.meals')}</span>
+            </Link>
+            <Link href="/medicine" className="quick-action-btn">
+              <span className="quick-action-icon" style={{ background: 'rgba(255, 59, 48, 0.12)', color: 'var(--danger)' }}>
+                <Icon name="med" size={20} />
+              </span>
+              <span>{t('nav.medicine')}</span>
+            </Link>
+            <Link href="/documents" className="quick-action-btn">
+              <span className="quick-action-icon" style={{ background: 'rgba(90, 200, 250, 0.12)', color: '#5AC8FA' }}>
+                <Icon name="docs" size={20} />
+              </span>
+              <span>{t('nav.documents')}</span>
+            </Link>
+          </div>
+        </section>
+
+        {members && members.length > 0 ? (
+          <section className="card" aria-label="Family members">
+            <div className="row between" style={{ marginBottom: 12 }}>
+              <h2>{t('nav.family')} ({members.length})</h2>
+              <Link href="/family" className="small bold">{t('dash.see_all')}</Link>
+            </div>
+            <div className="row wrap" style={{ gap: 12 }}>
+              {members.map((m) => (
+                <div key={m.id} className="row" style={{ padding: '8px 14px', background: 'var(--surface-2)', borderRadius: 14, gap: 10 }}>
+                  <Avatar member={m} size={32} />
+                  <div>
+                    <div className="bold small">{m.displayName}</div>
+                    <div className="tiny muted" style={{ textTransform: 'capitalize' }}>{m.relation || m.role}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
       <aside className="chat-aside card" style={{ width: 360, flex: 'none' }} aria-label="Family chat"><h2 style={{ marginBottom: 4 }}>{t('nav.chat')} {d.unreadChat ? <Badge tone="danger">{d.unreadChat} {t('notif.new')}</Badge> : null}</h2><ChatPanel compact /></aside>
       {amountFor ? <AmountSheet inst={amountFor} onClose={() => setAmountFor(null)} onDone={reload} /> : null}

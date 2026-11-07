@@ -553,7 +553,7 @@ export default function ChatPanel({ compact = false }) {
   if (!items) return <Spinner />;
 
   return (
-    <div className="chat" style={compact ? { height: 520 } : undefined}>
+    <div className="chat" style={compact ? { height: '100%', flex: 1, minHeight: 480 } : undefined}>
       <div
         className="chat-list"
         ref={listRef}
