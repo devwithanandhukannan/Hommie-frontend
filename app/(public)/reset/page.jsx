@@ -1,12 +1,12 @@
 'use client';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { post } from '@/lib/api';
 import { AuthCard } from '@/components/AuthCard';
 import { Field, Input, Btn, ErrorNote, useToast } from '@/components/ui';
 
-export default function Reset() {
+function ResetContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const toast = useToast();
@@ -305,5 +305,13 @@ export default function Reset() {
         </form>
       )}
     </AuthCard>
+  );
+}
+
+export default function Reset() {
+  return (
+    <Suspense fallback={null}>
+      <ResetContent />
+    </Suspense>
   );
 }
