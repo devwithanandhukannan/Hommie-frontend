@@ -68,11 +68,12 @@ export function formatQty(amount, unit, custom) {
 }
 
 function BoughtSheet({ item, onClose, onDone }) {
-  const { t } = useAuth();
+  const { t, lang } = useAuth();
   const [price, setPrice] = useState('');
   const [run, busy] = useAction();
-  const save = async (e) => {
-    e.preventDefault();
+
+  const saveWithPrice = async (e) => {
+    if (e) e.preventDefault();
     const body = {};
     const p = price ? toPaise(price) : null;
     if (price && !p) return;
@@ -82,11 +83,21 @@ function BoughtSheet({ item, onClose, onDone }) {
       onClose();
     }
   };
+
+  const markBoughtLater = async () => {
+    if (await run(() => post(`/grocery/${item.id}/bought`, {}), 'Marked as bought')) {
+      onDone();
+      onClose();
+    }
+  };
+
   return (
     <Sheet title={`${t('grocery.bought')} · ${item.name}`} onClose={onClose}>
-      <form className="col" onSubmit={save} style={{ gap: 14 }}>
-        <p className="muted small" style={{ margin: 0 }}>
-          {t('grocery.field_split')}
+      <form className="col" onSubmit={saveWithPrice} style={{ gap: 14 }}>
+        <p className="muted small" style={{ margin: 0, lineHeight: 1.5 }}>
+          {lang === 'ml'
+            ? 'സാധനം വാങ്ങി സ്റ്റോക്കിലേക്ക് മാറ്റാം. തുക ഇപ്പോൾ നൽകാം, അല്ലെങ്കിൽ പിന്നീട് ബിൽ നോക്കി ചേർക്കാം.'
+            : 'Mark item as bought and moved to stock. You can enter the price now, or add it later when checking bills.'}
         </p>
         <Field label={t('grocery.field_price')}>
           {(id) => (
@@ -100,7 +111,74 @@ function BoughtSheet({ item, onClose, onDone }) {
             />
           )}
         </Field>
-        <Btn type="submit" disabled={busy}>{t('btn.done')}</Btn>
+        <p className="tiny muted" style={{ margin: '-4px 0 0' }}>
+          {t('grocery.bought_sub')}
+        </p>
+        <div className="col" style={{ gap: 8, marginTop: 4 }}>
+          {price.trim() ? (
+            <Btn type="submit" disabled={busy}>
+              <Icon name="check" size={16} /> {t('grocery.save_with_price')}
+            </Btn>
+          ) : (
+            <Btn type="button" onClick={markBoughtLater} disabled={busy}>
+              <Icon name="check" size={16} /> {t('grocery.add_price_later')}
+            </Btn>
+          )}
+          {price.trim() ? (
+            <Btn type="button" tone="ghost" onClick={markBoughtLater} disabled={busy}>
+              {t('grocery.add_price_later')}
+            </Btn>
+          ) : (
+            <Btn type="button" tone="ghost" onClick={onClose}>
+              {t('btn.cancel')}
+            </Btn>
+          )}
+        </div>
+      </form>
+    </Sheet>
+  );
+}
+
+function AddPriceSheet({ item, onClose, onDone }) {
+  const { t } = useAuth();
+  const [price, setPrice] = useState(item.lastPrice ? String(item.lastPrice / 100) : '');
+  const [run, busy] = useAction();
+
+  const save = async (e) => {
+    e.preventDefault();
+    const p = toPaise(price);
+    if (!p || p <= 0) return;
+    if (await run(() => post(`/grocery/${item.id}/price`, { price: p }), 'Price recorded')) {
+      onDone();
+      onClose();
+    }
+  };
+
+  return (
+    <Sheet title={`${t('grocery.add_price')} · ${item.name}`} onClose={onClose}>
+      <form className="col" onSubmit={save} style={{ gap: 14 }}>
+        <p className="muted small" style={{ margin: 0, lineHeight: 1.5 }}>
+          {t('grocery.add_price_sub')}
+        </p>
+        <Field label={t('grocery.field_price')}>
+          {(id) => (
+            <Input
+              id={id}
+              inputMode="decimal"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="120"
+              autoFocus
+              required
+            />
+          )}
+        </Field>
+        <div className="row" style={{ gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
+          <Btn type="button" tone="ghost" onClick={onClose}>{t('btn.cancel')}</Btn>
+          <Btn type="submit" disabled={busy || !price.trim()}>
+            <Icon name="check" size={16} /> {t('btn.done')}
+          </Btn>
+        </div>
       </form>
     </Sheet>
   );
@@ -221,6 +299,7 @@ export default function GroceryPage() {
 
   const [buying, setBuying] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [pricing, setPricing] = useState(null);
 
   // Drag and drop state
   const [draggingId, setDraggingId] = useState(null);
@@ -531,20 +610,46 @@ export default function GroceryPage() {
                       </div>
                       <div className="col" style={{ alignItems: 'flex-end', gap: 4 }}>
                         {g.qty ? <span className="qty-pill">{g.qty}</span> : null}
+                        {g.lastPrice ? <span className="qty-pill" style={{ color: 'var(--ok)', background: 'var(--ok-surface, rgba(16, 185, 129, 0.12))' }}>₹{Math.round(g.lastPrice / 100)}</span> : null}
                         {g.likelyLow ? <Badge tone="warn">{t('grocery.low')}</Badge> : null}
                       </div>
                     </div>
 
-                    <div className="row between" style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid var(--line-soft)' }}>
-                      <button
-                        type="button"
-                        className="btn ghost sm"
-                        style={{ padding: '4px 10px', fontSize: 12 }}
-                        onClick={() => markNeeded(g)}
-                        title="Add back to needed"
-                      >
-                        {t('grocery.need_again')}
-                      </button>
+                    <div className="row between wrap" style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid var(--line-soft)', gap: 6 }}>
+                      <div className="row wrap" style={{ gap: 6 }}>
+                        <button
+                          type="button"
+                          className="btn ghost sm"
+                          style={{ padding: '4px 10px', fontSize: 12 }}
+                          onClick={() => markNeeded(g)}
+                          title="Add back to needed"
+                        >
+                          {t('grocery.need_again')}
+                        </button>
+                        {g.lastPrice ? (
+                          <button
+                            type="button"
+                            className="btn ghost sm"
+                            style={{ padding: '4px 8px', fontSize: 12, color: 'var(--brand)', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                            onClick={() => setPricing(g)}
+                            title="Update price"
+                          >
+                            <Icon name="money" size={13} />
+                            <span>₹{Math.round(g.lastPrice / 100)}</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn sm"
+                            style={{ padding: '4px 10px', fontSize: 12, background: 'var(--brand-surface, rgba(99, 102, 241, 0.12))', color: 'var(--brand)', border: '1px dashed var(--brand)', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                            onClick={() => setPricing(g)}
+                            title={t('grocery.add_price')}
+                          >
+                            <Icon name="money" size={13} />
+                            <span>+ {t('grocery.add_price')}</span>
+                          </button>
+                        )}
+                      </div>
                       <div className="row" style={{ gap: 4 }}>
                         <button
                           type="button"
@@ -626,13 +731,23 @@ export default function GroceryPage() {
                     <div className="row" style={{ gap: 8, alignItems: 'center' }}>
                       <span className="bold">{g.name}</span>
                       {g.qty ? <span className="qty-pill">{g.qty}</span> : null}
+                      {g.lastPrice ? <span className="qty-pill" style={{ color: 'var(--ok)', background: 'var(--ok-surface, rgba(16, 185, 129, 0.12))' }}>₹{Math.round(g.lastPrice / 100)}</span> : null}
                       {g.likelyLow ? <Badge tone="warn">{t('grocery.low')}</Badge> : null}
                     </div>
                     <div className="small muted">
                       {last(g)}{g.avgIntervalDays ? ` · about every ${Math.round(g.avgIntervalDays)} days` : ''}
                     </div>
                   </div>
-                  <div className="row" style={{ gap: 4 }}>
+                  <div className="row wrap" style={{ gap: 6, alignItems: 'center' }}>
+                    {g.lastPrice ? (
+                      <Btn size="sm" tone="ghost" onClick={() => setPricing(g)} title="Update price" style={{ color: 'var(--brand)' }}>
+                        <Icon name="money" size={13} /> ₹{Math.round(g.lastPrice / 100)}
+                      </Btn>
+                    ) : (
+                      <Btn size="sm" onClick={() => setPricing(g)} title={t('grocery.add_price')} style={{ background: 'var(--brand-surface, rgba(99, 102, 241, 0.12))', color: 'var(--brand)', border: '1px dashed var(--brand)' }}>
+                        <Icon name="money" size={13} /> {t('grocery.add_price')}
+                      </Btn>
+                    )}
                     <Btn size="sm" tone="ghost" onClick={() => markNeeded(g)}>
                       {t('grocery.need_again')}
                     </Btn>
@@ -663,6 +778,11 @@ export default function GroceryPage() {
       {/* Bought Price Sheet */}
       {buying ? (
         <BoughtSheet item={buying} onClose={() => setBuying(null)} onDone={reload} />
+      ) : null}
+
+      {/* Add Price Sheet */}
+      {pricing ? (
+        <AddPriceSheet item={pricing} onClose={() => setPricing(null)} onDone={reload} />
       ) : null}
 
       {/* Edit Grocery Sheet */}
