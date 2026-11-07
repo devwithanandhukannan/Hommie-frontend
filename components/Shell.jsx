@@ -7,17 +7,28 @@ import { Icon, Sheet, Btn, Badge } from '@/components/ui';
 import { applyTheme, getSavedTheme } from '@/lib/theme';
 import PermissionsPrompt from '@/components/PermissionsPrompt';
 import PwaInstallPrompt from '@/components/PwaInstallPrompt';
+import QuickActionFab from '@/components/QuickActionFab';
 
-const NAV = [
-  ['/dashboard', 'nav.home', 'home'], ['/calendar', 'nav.calendar', 'calendar'], ['/tasks', 'nav.tasks', 'tasks'], ['/bills', 'nav.bills', 'bills'], ['/money', 'nav.money', 'money'],
-  ['/grocery', 'nav.grocery', 'grocery'], ['/meals', 'nav.meals', 'meals'], ['/recipes', 'nav.recipes', 'meals'], ['/documents', 'nav.documents', 'docs'], ['/medicine', 'nav.medicine', 'med'],
-  ['/special-days', 'nav.days', 'days'], ['/chat', 'nav.chat', 'chat'], ['/family', 'nav.family', 'family'], ['/settings', 'nav.settings', 'settings'],
-];
-const TABS = [
-  ['/dashboard', 'nav.home', 'home'],
+const MAIN_NAV = [
+  ['/dashboard', 'nav.today', 'home'],
   ['/chat', 'nav.chat', 'chat'],
-  ['/tasks', 'nav.tasks', 'tasks'],
-  ['/bills', 'nav.bills', 'bills'],
+  ['/planner', 'nav.planner', 'tasks'],
+  ['/money', 'nav.money', 'money'],
+];
+
+const MORE_NAV = [
+  ['/medicine', 'nav.medicine', 'med'],
+  ['/documents', 'nav.documents', 'docs'],
+  ['/special-days', 'nav.days', 'days'],
+  ['/family', 'nav.family', 'family'],
+  ['/settings', 'nav.settings', 'settings'],
+];
+
+const TABS = [
+  ['/dashboard', 'nav.today', 'home'],
+  ['/chat', 'nav.chat', 'chat'],
+  ['/planner', 'nav.planner', 'tasks'],
+  ['/money', 'nav.money', 'money'],
   ['/more', 'nav.more', 'menu'],
 ];
 
@@ -67,7 +78,20 @@ export default function Shell({ children }) {
   const notes = useData('/me/notifications', { interval: 60000 });
   const unread = notes.data?.unread || 0;
   const chatUnread = families.find((f) => f.id === familyId)?.unreadChat || 0;
-  const active = (href) => (path === href || (href !== '/dashboard' && path.startsWith(`${href}/`)) ? 'page' : undefined);
+  const isTabActive = (href) => {
+    if (href === '/dashboard') return path === '/dashboard' ? 'page' : undefined;
+    if (href === '/chat') return path === '/chat' ? 'page' : undefined;
+    if (href === '/planner') {
+      return ['/planner', '/tasks', '/grocery', '/meals', '/recipes', '/calendar'].some((p) => path === p || path.startsWith(`${p}/`)) ? 'page' : undefined;
+    }
+    if (href === '/money') {
+      return ['/money', '/bills'].some((p) => path === p || path.startsWith(`${p}/`)) ? 'page' : undefined;
+    }
+    if (href === '/more') {
+      return ['/more', '/medicine', '/documents', '/special-days', '/family', '/settings'].some((p) => path === p || path.startsWith(`${p}/`)) ? 'page' : undefined;
+    }
+    return (path === href || path.startsWith(`${href}/`)) ? 'page' : undefined;
+  };
 
   useEffect(() => {
     const saved = getSavedTheme();
@@ -118,10 +142,18 @@ export default function Shell({ children }) {
             {bell}
           </div>
         </div>
-        {NAV.map(([href, key, icon]) => (
-          <Link key={href} href={href} className="navlink" aria-current={active(href)}>
+        {MAIN_NAV.map(([href, key, icon]) => (
+          <Link key={href} href={href} className="navlink" aria-current={isTabActive(href)}>
             <span className="row"><Icon name={icon} size={20} />{t(key)}</span>
             {href === '/chat' && chatUnread ? <span className="badge danger">{chatUnread}</span> : null}
+          </Link>
+        ))}
+        <div style={{ margin: '14px 0 6px 12px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--muted)', letterSpacing: '0.04em' }}>
+          {t('nav.more')}
+        </div>
+        {MORE_NAV.map(([href, key, icon]) => (
+          <Link key={href} href={href} className="navlink" aria-current={isTabActive(href)}>
+            <span className="row"><Icon name={icon} size={20} />{t(key)}</span>
           </Link>
         ))}
         <div style={{ flex: 1 }} />
@@ -174,8 +206,7 @@ export default function Shell({ children }) {
         </main>
         <nav className="tabbar mobile-only" aria-label="Main navigation">
           {TABS.map(([href, key, icon]) => {
-            const isMoreActive = href === '/more' && ['/more', '/settings', '/calendar', '/money', '/grocery', '/meals', '/documents', '/medicine', '/special-days', '/family', '/recipes'].some((p) => path.startsWith(p));
-            const isCurrent = Boolean(isMoreActive || active(href));
+            const isCurrent = Boolean(isTabActive(href));
             return (
               <Link
                 key={href}
@@ -197,6 +228,7 @@ export default function Shell({ children }) {
       {open ? <FamilySwitcher onClose={() => setOpen(false)} /> : null}
       <PermissionsPrompt />
       <PwaInstallPrompt />
+      <QuickActionFab />
     </div>
   );
 }

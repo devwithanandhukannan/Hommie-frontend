@@ -45,89 +45,204 @@ export default function Dashboard() {
   return (
     <div className="row wrap" style={{ alignItems: 'flex-start', gap: 20 }}>
       <div className="grow col" style={{ minWidth: 300 }}>
+        {/* Warm Caring Header */}
         <div>
           <div className="row between" style={{ alignItems: 'flex-start' }}>
             <div>
-              <h1>{greet}, {user.name.split(' ')[0]}</h1>
-              <p className="muted small" style={{ margin: '4px 0 0' }}>{family.name} · {todo ? `${todo} thing${todo === 1 ? '' : 's'} need you` : 'You are all caught up'}</p>
+              <h1 style={{ margin: 0, fontSize: 26, letterSpacing: '-0.02em' }}>
+                {greet}, {user.name.split(' ')[0]} 👋
+              </h1>
+              <p className="muted small" style={{ margin: '4px 0 0' }}>
+                {family.name} · {todo ? (lang === 'ml' ? `ഇന്ന് ${todo} കാര്യങ്ങൾ ചെയ്യാനുണ്ട്` : `${todo} thing${todo === 1 ? '' : 's'} need you today`) : (lang === 'ml' ? 'ഇന്നത്തെ കാര്യങ്ങളെല്ലാം പൂർത്തിയായി ✨' : 'You are all caught up ✨')}
+              </p>
             </div>
             <button
               type="button"
               className="btn light sm"
               onClick={() => setAiOpen(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 20, padding: '6px 12px', fontWeight: 600, color: 'var(--brand)' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 20, padding: '7px 14px', fontWeight: 600, color: 'var(--brand)', background: 'rgba(13, 71, 52, 0.08)', border: '1px solid rgba(13, 71, 52, 0.2)' }}
               title={lang === 'ml' ? 'എഐ വോയ്സ് അസിസ്റ്റന്റ്' : 'AI Voice Assistant'}
             >
-              <span>✨</span> {lang === 'ml' ? 'എഐ വോയ്സ്' : 'AI Voice'}
+              <span>🎙️ ✨</span> {lang === 'ml' ? 'എഐ വോയ്സ്' : 'AI Voice'}
             </button>
           </div>
         </div>
 
-        <section className="card hero" aria-label="Wallet">
-          <div className="row between"><span className="small">{t('dash.wallet')} · {family.name}</span><Link className="btn light sm" href="/money">{t('dash.settle_up')}</Link></div>
-          <div style={{ fontSize: 32, fontWeight: 700, margin: '4px 0' }}>{rupees(d.wallet.net, { sign: true })}</div>
-          <div className="row small" style={{ gap: 24 }}><span>{t('dash.owed_to_you')} <b>{rupees(d.wallet.owed)}</b></span><span>{t('dash.you_owe')} <b>{rupees(d.wallet.owe)}</b></span></div>
+        {/* 1. TODAY'S ESSENTIALS: Medicine Due Today (First Priority for Family Care) */}
+        {d.medicinesDueToday.length ? (
+          <section className="card" aria-label="Medicine" style={{ borderLeft: '4px solid #10B981' }}>
+            <div className="row between" style={{ marginBottom: 8 }}>
+              <div className="row" style={{ gap: 8 }}>
+                <span style={{ fontSize: 18 }}>💊</span>
+                <h2 style={{ margin: 0, fontSize: 16 }}>{lang === 'ml' ? 'കഴിക്കേണ്ട മരുന്നുകൾ' : t('dash.medicine')}</h2>
+              </div>
+              <Link href="/medicine" className="small bold">{t('dash.see_all')}</Link>
+            </div>
+            <div className="list">
+              {d.medicinesDueToday.map((m) => (
+                <div key={`${m.medicineId}${m.time}`} className="item">
+                  <div className="grow">
+                    <div className="bold">{m.forMember?.displayName} · {m.name}</div>
+                    <div className="small muted">{m.time}{m.dosage ? ` · ${m.dosage}` : ''}</div>
+                  </div>
+                  {m.status === 'missed' ? <Badge tone="danger">{lang === 'ml' ? 'വിട്ടുപോയി' : 'Missed'}</Badge> : null}
+                  <Btn size="sm" onClick={() => give(m)}>
+                    {lang === 'ml' ? 'നൽകി ✓' : t('med.given')}
+                  </Btn>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {/* 2. TODAY'S MEALS: What's cooking today */}
+        <section className="card" aria-label="Meals">
+          <div className="row between" style={{ marginBottom: 10 }}>
+            <div className="row" style={{ gap: 8 }}>
+              <span style={{ fontSize: 18 }}>🍲</span>
+              <h2 style={{ margin: 0, fontSize: 16 }}>{lang === 'ml' ? 'ഇന്നത്തെ ഭക്ഷണം' : t('dash.meals')}</h2>
+            </div>
+            <Link href="/planner?tab=meals" className="small bold">{lang === 'ml' ? 'പ്ലാൻ ചെയ്യുക ›' : t('dash.plan')}</Link>
+          </div>
+          {d.todayMeals.length === 0 ? (
+            <p className="muted small" style={{ margin: 0 }}>
+              {lang === 'ml' ? 'ഇന്നത്തെ ഭക്ഷണ മെനു ചേർത്തിട്ടില്ല.' : t('dash.no_meals')}
+            </p>
+          ) : (
+            <div className="row wrap" style={{ gap: 10 }}>
+              {['morning', 'noon', 'night'].map((s) => {
+                const m = d.todayMeals.find((x) => x.slot === s);
+                const slotName = s === 'morning' ? (lang === 'ml' ? 'രാവിലെ' : 'Morning') : s === 'noon' ? (lang === 'ml' ? 'ഉച്ചയ്ക്ക്' : 'Noon') : (lang === 'ml' ? 'രാത്രി' : 'Night');
+                return (
+                  <div
+                    key={s}
+                    style={{
+                      flex: 1,
+                      minWidth: 120,
+                      padding: '8px 12px',
+                      background: 'var(--surface-2)',
+                      borderRadius: 12,
+                      border: '1px solid var(--line)',
+                    }}
+                  >
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
+                      {slotName}
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: 13, marginTop: 2, wordBreak: 'break-word' }}>
+                      {m?.items?.join(', ') || '—'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
+        {/* 3. TODAY'S TASKS: Chores & To-Dos */}
         <section className="card" aria-label="To do">
-          <div className="row between"><h2>{t('dash.todo')}</h2><Link href="/tasks" className="small bold">{t('dash.see_all')}</Link></div>
-          {d.billsNeedingAmount.length + d.myTasks.length === 0 ? <Empty>{t('dash.no_tasks')}</Empty> : (
+          <div className="row between" style={{ marginBottom: 10 }}>
+            <div className="row" style={{ gap: 8 }}>
+              <span style={{ fontSize: 18 }}>🧹</span>
+              <h2 style={{ margin: 0, fontSize: 16 }}>{lang === 'ml' ? 'ഇന്നത്തെ ജോലികൾ' : t('dash.todo')}</h2>
+            </div>
+            <Link href="/planner?tab=tasks" className="small bold">{t('dash.see_all')}</Link>
+          </div>
+          {d.billsNeedingAmount.length + d.myTasks.length === 0 ? (
+            <Empty>{lang === 'ml' ? 'ഇന്ന് ചെയ്യേണ്ട ജോലികൾ ഒന്നുമില്ല ✨' : t('dash.no_tasks')}</Empty>
+          ) : (
             <div className="list">
               {d.billsNeedingAmount.map((b) => (
-                <div key={b.id} className="item"><div className="grow"><div className="bold">Enter {b.billTitle} amount</div><div className="small muted">Due {shortDate(b.dueDate)} · {daysLabel(b.daysLeft)}</div></div><Badge tone="warn">{t('dash.amount_needed')}</Badge><Btn size="sm" onClick={() => setAmountFor(b)}>{t('btn.add')}</Btn></div>
+                <div key={b.id} className="item">
+                  <div className="grow">
+                    <div className="bold">{lang === 'ml' ? `${b.billTitle} തുക നൽകുക` : `Enter ${b.billTitle} amount`}</div>
+                    <div className="small muted">Due {shortDate(b.dueDate)} · {daysLabel(b.daysLeft)}</div>
+                  </div>
+                  <Badge tone="warn">{t('dash.amount_needed')}</Badge>
+                  <Btn size="sm" onClick={() => setAmountFor(b)}>{t('btn.add')}</Btn>
+                </div>
               ))}
               {d.myTasks.filter((x) => x.kind !== 'bill').map((x) => (
                 <div key={x.id} className="item">
-                  <button type="button" className="circle" aria-label={`Mark "${x.title}" done`} onClick={() => complete(x)}><span /></button>
-                  <div className="grow"><div className="bold">{x.title}</div><div className="small muted">{x.dueDate ? `Due ${shortDate(x.dueDate)}` : 'No due date'}</div></div>
+                  <button type="button" className="circle" aria-label={`Mark "${x.title}" done`} onClick={() => complete(x)}>
+                    <span />
+                  </button>
+                  <div className="grow">
+                    <div className="bold">{x.title}</div>
+                    <div className="small muted">{x.dueDate ? `Due ${shortDate(x.dueDate)}` : (lang === 'ml' ? 'തിയ്യതി നിശ്ചയിച്ചിട്ടില്ല' : 'No due date')}</div>
+                  </div>
                   <Badge>{x.kind === 'chore' ? t('tasks.chore') : t('tasks.type_task')}</Badge>
                 </div>
               ))}
-              {d.myTasks.filter((x) => x.kind === 'bill' && !d.billsNeedingAmount.some((b) => b.taskId === x.id)).map((x) => (
-                <div key={x.id} className="item"><div className="grow"><div className="bold">{x.title}</div><div className="small muted">{x.dueDate ? `Due ${shortDate(x.dueDate)}` : ''}</div></div><Link className="btn sm" href="/bills">{t('dash.open')}</Link></div>
-              ))}
             </div>
           )}
-          {d.unclaimedTasks ? <p className="small muted" style={{ marginBottom: 0 }}><Link href="/tasks">{d.unclaimedTasks} {t('dash.unassigned')}</Link></p> : null}
+          {d.unclaimedTasks ? (
+            <p className="small muted" style={{ margin: '8px 0 0' }}>
+              <Link href="/planner?tab=tasks">{d.unclaimedTasks} {t('dash.unassigned')}</Link>
+            </p>
+          ) : null}
         </section>
 
-        {d.medicinesDueToday.length ? (
-          <section className="card" aria-label="Medicine"><h2>{t('dash.medicine')}</h2><div className="list">
-            {d.medicinesDueToday.map((m) => (
-              <div key={`${m.medicineId}${m.time}`} className="item"><div className="grow"><div className="bold">{m.forMember?.displayName} · {m.name}</div><div className="small muted">{m.time}{m.dosage ? ` · ${m.dosage}` : ''}</div></div>{m.status === 'missed' ? <Badge tone="danger">Missed</Badge> : null}<Btn size="sm" onClick={() => give(m)}>{t('med.given')}</Btn></div>
-            ))}</div></section>
-        ) : null}
-
-        <section className="card" aria-label="Coming up"><div className="row between"><h2>{t('dash.coming')}</h2><div className="row" style={{ gap: 12 }}><Link href="/calendar" className="small bold">{t('nav.calendar')} ›</Link><Link href="/bills" className="small bold">{t('nav.bills')}</Link></div></div>
-          {d.upcomingBills.length + d.upcomingEmi.length + d.specialDatesSoon.length === 0 ? <Empty>{t('dash.no_coming')}</Empty> : (
-            <div className="list">
-              {d.upcomingBills.map((b) => (
-                <div key={b.id} className="item"><div className="grow"><div className="bold">{b.billTitle}</div><div className="small muted">{t('cat.' + b.category) || CATEGORY_LABEL[b.category]} · {shortDate(b.dueDate)} ({daysLabel(b.daysLeft)}){b.amount ? ` · ${rupees(b.amount)}` : ''}</div></div>{b.overdue ? <Badge tone="danger">Overdue</Badge> : <Badge tone={b.status === 'awaiting_amount' ? 'warn' : ''}>{b.status === 'awaiting_amount' ? t('dash.amount_needed') : t('bills.to_pay')}</Badge>}</div>
-              ))}
-              {d.upcomingEmi.map((l) => (<div key={l.id} className="item"><div className="grow"><div className="bold">{l.lender} EMI</div><div className="small muted">{shortDate(l.nextEmiDate)} · {rupees(l.emiAmount)} · private</div></div></div>))}
-              {d.specialDatesSoon.map((s) => (<div key={s.id} className="item"><div className="grow"><div className="bold">{s.title}</div><div className="small muted">{shortDate(s.nextDate)} ({daysLabel(s.daysAway)})</div></div><Badge tone="info">{s.kind}</Badge></div>))}
+        {/* 4. GROCERY PREVIEW: Items to buy */}
+        <section className="card" aria-label="Grocery">
+          <div className="row between" style={{ marginBottom: 10 }}>
+            <div className="row" style={{ gap: 8 }}>
+              <span style={{ fontSize: 18 }}>🛒</span>
+              <h2 style={{ margin: 0, fontSize: 16 }}>{lang === 'ml' ? 'വാങ്ങേണ്ട പലചരക്കുകൾ' : t('dash.grocery')}</h2>
             </div>
-          )}
+            <Link href="/planner?tab=grocery" className="small bold">{lang === 'ml' ? 'ലിസ്റ്റ് തുറക്കുക ›' : t('dash.open')}</Link>
+          </div>
+          <div className="row between wrap" style={{ gap: 10, alignItems: 'center' }}>
+            <div>
+              <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--brand)' }}>
+                {d.grocery.needed}
+              </span>
+              <span style={{ marginLeft: 6, fontWeight: 500 }}>
+                {d.grocery.needed === 1 ? (lang === 'ml' ? 'സാധനം വാങ്ങാനുണ്ട്' : t('dash.item_needed')) : (lang === 'ml' ? 'സാധനങ്ങൾ വാങ്ങാനുണ്ട്' : t('dash.items_needed'))}
+              </span>
+              {d.grocery.likelyLow.length ? (
+                <div className="small muted" style={{ marginTop: 4 }}>
+                  {lang === 'ml' ? 'തീരാറായവ' : t('dash.running_low')}: {d.grocery.likelyLow.map((g) => g.name).join(', ')}
+                </div>
+              ) : null}
+            </div>
+            <Link href="/planner?tab=grocery" className="btn light sm">
+              + {lang === 'ml' ? 'ചേർക്കുക' : t('btn.add')}
+            </Link>
+          </div>
         </section>
 
-        {d.expiringDocuments.length ? (
-          <section className="card"><div className="row between"><h2>{t('dash.docs')}</h2><Link href="/documents" className="small bold">{t('docs.title')}</Link></div><div className="list">
-            {d.expiringDocuments.map((x) => (<div key={x.id} className="item"><div className="grow bold">{x.title}</div><Badge tone={x.expiresInDays < 8 ? 'danger' : 'warn'}>{x.expiresInDays < 0 ? 'Expired' : `in ${x.expiresInDays} days`}</Badge></div>))}</div></section>
-        ) : null}
+        {/* 5. COMPACT FINANCES: Friendly Family Wallet & Upcoming Bills */}
+        <section className="card" aria-label="Finances" style={{ background: 'var(--surface-2)', border: '1px solid var(--line)' }}>
+          <div className="row between" style={{ marginBottom: 8 }}>
+            <div className="row" style={{ gap: 8 }}>
+              <span style={{ fontSize: 18 }}>💳</span>
+              <h2 style={{ margin: 0, fontSize: 16 }}>{lang === 'ml' ? 'കുടുംബ ചിലവുകൾ & ബില്ലുകൾ' : 'Family Finances'}</h2>
+            </div>
+            <Link href="/money" className="small bold">{lang === 'ml' ? 'വിശദാംശങ്ങൾ ›' : t('dash.settle_up')}</Link>
+          </div>
+          <div className="row wrap between" style={{ alignItems: 'center', gap: 14 }}>
+            <div>
+              <div className="small muted">{lang === 'ml' ? 'കയ്യിലുള്ള ബാലൻസ്' : 'Net Family Balance'}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: d.wallet.net >= 0 ? '#10B981' : '#EF4444' }}>
+                {rupees(d.wallet.net, { sign: true })}
+              </div>
+            </div>
+            {d.upcomingBills.length > 0 ? (
+              <div style={{ textAlign: 'right' }}>
+                <div className="small muted">{lang === 'ml' ? 'ഈ ആഴ്ച അടയ്ക്കാനുള്ള ബിൽ' : 'Next bill due'}</div>
+                <div className="bold" style={{ fontSize: 14 }}>
+                  {d.upcomingBills[0].billTitle} {d.upcomingBills[0].amount ? `· ${rupees(d.upcomingBills[0].amount)}` : ''}
+                </div>
+                <div className="tiny muted">Due {shortDate(d.upcomingBills[0].dueDate)} ({daysLabel(d.upcomingBills[0].daysLeft)})</div>
+              </div>
+            ) : null}
+          </div>
+        </section>
 
-        <div className="grid-auto">
-          <section className="card"><div className="row between"><h2>{t('dash.grocery')}</h2><Link href="/grocery" className="small bold">{t('dash.open')}</Link></div>
-            <p style={{ margin: 0 }}><b>{d.grocery.needed}</b> {d.grocery.needed === 1 ? t('dash.item_needed') : t('dash.items_needed')}</p>
-            {d.grocery.likelyLow.length ? <p className="small muted" style={{ marginBottom: 0 }}>{t('dash.running_low')}: {d.grocery.likelyLow.map((g) => g.name).join(', ')}</p> : null}
-          </section>
-          <section className="card"><div className="row between"><h2>{t('dash.meals')}</h2><Link href="/meals" className="small bold">{t('dash.plan')}</Link></div>
-            {d.todayMeals.length === 0 ? <p className="muted small" style={{ margin: 0 }}>{t('dash.no_meals')}</p> : ['morning', 'noon', 'night'].map((s) => { const m = d.todayMeals.find((x) => x.slot === s); return m ? <p key={s} style={{ margin: '0 0 4px' }}><b style={{ textTransform: 'capitalize' }}>{s}</b>: {m.items.join(', ') || '—'}</p> : null; })}
-          </section>
-        </div>
-
+        {/* 6. QUICK ACTIONS GRID */}
         <section className="card" aria-label="Quick Actions">
           <div className="row between" style={{ marginBottom: 12 }}>
-            <h2>{t('dash.quick_actions')}</h2>
+            <h2 style={{ fontSize: 16 }}>{t('dash.quick_actions')}</h2>
           </div>
           <div className="quick-actions-grid">
             <button
@@ -141,11 +256,23 @@ export default function Dashboard() {
               </span>
               <span>{lang === 'ml' ? '✨ എഐ വോയ്സ്' : '✨ AI Voice'}</span>
             </button>
-            <Link href="/tasks" className="quick-action-btn">
+            <Link href="/planner?tab=tasks" className="quick-action-btn">
               <span className="quick-action-icon" style={{ background: 'rgba(0, 113, 227, 0.12)', color: 'var(--info)' }}>
                 <Icon name="tasks" size={20} />
               </span>
               <span>{t('nav.tasks')}</span>
+            </Link>
+            <Link href="/planner?tab=grocery" className="quick-action-btn">
+              <span className="quick-action-icon" style={{ background: 'rgba(52, 199, 89, 0.12)', color: 'var(--ok)' }}>
+                <Icon name="grocery" size={20} />
+              </span>
+              <span>{t('nav.grocery')}</span>
+            </Link>
+            <Link href="/planner?tab=meals" className="quick-action-btn">
+              <span className="quick-action-icon" style={{ background: 'rgba(175, 82, 222, 0.12)', color: '#AF52DE' }}>
+                <Icon name="meals" size={20} />
+              </span>
+              <span>{t('nav.meals')}</span>
             </Link>
             <Link href="/money" className="quick-action-btn">
               <span className="quick-action-icon" style={{ background: 'rgba(255, 149, 0, 0.12)', color: 'var(--warn)' }}>
@@ -153,37 +280,20 @@ export default function Dashboard() {
               </span>
               <span>{t('nav.money')}</span>
             </Link>
-            <Link href="/grocery" className="quick-action-btn">
-              <span className="quick-action-icon" style={{ background: 'rgba(52, 199, 89, 0.12)', color: 'var(--ok)' }}>
-                <Icon name="grocery" size={20} />
-              </span>
-              <span>{t('nav.grocery')}</span>
-            </Link>
-            <Link href="/meals" className="quick-action-btn">
-              <span className="quick-action-icon" style={{ background: 'rgba(175, 82, 222, 0.12)', color: '#AF52DE' }}>
-                <Icon name="meals" size={20} />
-              </span>
-              <span>{t('nav.meals')}</span>
-            </Link>
             <Link href="/medicine" className="quick-action-btn">
               <span className="quick-action-icon" style={{ background: 'rgba(255, 59, 48, 0.12)', color: 'var(--danger)' }}>
                 <Icon name="med" size={20} />
               </span>
               <span>{t('nav.medicine')}</span>
             </Link>
-            <Link href="/documents" className="quick-action-btn">
-              <span className="quick-action-icon" style={{ background: 'rgba(90, 200, 250, 0.12)', color: '#5AC8FA' }}>
-                <Icon name="docs" size={20} />
-              </span>
-              <span>{t('nav.documents')}</span>
-            </Link>
           </div>
         </section>
 
+        {/* 7. FAMILY MEMBERS */}
         {members && members.length > 0 ? (
           <section className="card" aria-label="Family members">
             <div className="row between" style={{ marginBottom: 12 }}>
-              <h2>{t('nav.family')} ({members.length})</h2>
+              <h2 style={{ fontSize: 16 }}>{t('nav.family')} ({members.length})</h2>
               <Link href="/family" className="small bold">{t('dash.see_all')}</Link>
             </div>
             <div className="row wrap" style={{ gap: 12 }}>
@@ -200,7 +310,11 @@ export default function Dashboard() {
           </section>
         ) : null}
       </div>
-      <aside className="chat-aside card" style={{ width: 360, flex: 'none' }} aria-label="Family chat"><h2 style={{ marginBottom: 4 }}>{t('nav.chat')} {d.unreadChat ? <Badge tone="danger">{d.unreadChat} {t('notif.new')}</Badge> : null}</h2><ChatPanel compact /></aside>
+
+      <aside className="chat-aside card" style={{ width: 360, flex: 'none' }} aria-label="Family chat">
+        <h2 style={{ marginBottom: 4 }}>{t('nav.chat')} {d.unreadChat ? <Badge tone="danger">{d.unreadChat} {t('notif.new')}</Badge> : null}</h2>
+        <ChatPanel compact />
+      </aside>
       {amountFor ? <AmountSheet inst={amountFor} onClose={() => setAmountFor(null)} onDone={reload} /> : null}
       {aiOpen ? (
         <AiAssistantModal
