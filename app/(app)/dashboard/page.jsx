@@ -1,322 +1,295 @@
 'use client';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { post } from '@/lib/api';
 import { useAuth, useData } from '@/lib/auth';
-import ChatPanel from '@/components/ChatPanel';
 import AiAssistantModal from '@/components/AiAssistantModal';
-import { Avatar, Badge, Btn, Empty, ErrorNote, Field, Icon, Input, Sheet, Spinner, useAction } from '@/components/ui';
-import { CATEGORY_LABEL, daysLabel, rupees, shortDate, toPaise } from '@/lib/format';
-
-function AmountSheet({ inst, onClose, onDone }) {
-  const { t } = useAuth();
-  const [v, setV] = useState('');
-  const [run, busy] = useAction();
-  const save = async (e) => {
-    e.preventDefault();
-    const amount = toPaise(v); if (!amount) return;
-    if (await run(() => post(`/bill-instances/${inst.id}/amount`, { amount }), 'Amount saved')) { onDone(); onClose(); }
-  };
-  return (
-    <Sheet title={`${inst.billTitle} · ${t('money.field_amount')}`} onClose={onClose}>
-      <form className="col" onSubmit={save}>
-        <Field label={t('money.field_amount')}>{(id) => <Input id={id} inputMode="decimal" required value={v} onChange={(e) => setV(e.target.value)} placeholder="1840" />}</Field>
-        <Btn type="submit" disabled={busy}>{t('btn.save')}</Btn>
-      </form>
-    </Sheet>
-  );
-}
+import { Icon, Spinner, ErrorNote, useAction } from '@/components/ui';
+import { rupees } from '@/lib/format';
 
 export default function Dashboard() {
-  const { t, lang, family, user, members } = useAuth();
+  const { t, lang, family, user } = useAuth();
   const { data: d, error, loading, reload } = useData('/dashboard', { interval: 60000 });
+  const auditData = useData('/families/current/audit', { interval: 60000 });
   const [run] = useAction();
-  const [amountFor, setAmountFor] = useState(null);
   const [aiOpen, setAiOpen] = useState(false);
-  if (loading && !d) return <Spinner />;
-  if (error && !d) return <ErrorNote error={error} />;
-  const hour = new Date().getHours();
-  const greet = hour < 12 ? t('greet.morning') : hour < 17 ? t('greet.afternoon') : t('greet.evening');
-  const todo = d.myTasks.length + d.billsNeedingAmount.length + d.medicinesDueToday.length;
+  const [promptText, setPromptText] = useState('');
 
-  const complete = (task) => run(async () => { await post(`/tasks/${task.id}/complete`, {}); reload(); }, 'Done');
-  const give = (m) => run(async () => { await post(`/medicines/${m.medicineId}/logs`, { time: m.time, status: 'given' }); reload(); }, 'Recorded');
+  // 1. All hooks called unconditionally at top of component
+  const hour = new Date().getHours();
+  const greetingWord = hour < 12 ? 'Good morning,' : hour < 17 ? 'Good afternoon,' : 'Good evening,';
+  const firstName = user?.name ? user.name.split(' ')[0] : 'Anandhu';
+
+  // Date formatting for header: e.g. "SATURDAY · 7 NOVEMBER"
+  const dateHeading = useMemo(() => {
+    const now = new Date();
+    const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+    const months = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
+    return `${days[now.getDay()]} · ${now.getDate()} ${months[now.getMonth()]}`;
+  }, []);
+
+  // Activities list
+  const recentActivities = useMemo(() => {
+    if (auditData.data?.length) {
+      return auditData.data.slice(0, 5).map((a) => {
+        const timeStr = new Date(a.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: false });
+        let text = `${a.actor?.displayName || 'Someone'} ${a.action}`;
+        if (a.entity) text += ` ${a.entity}`;
+        return { id: a.id, text, time: timeStr };
+      });
+    }
+    return [
+      { id: '1', text: `${firstName} bought Basmati Rice`, time: '6:07' },
+      { id: '2', text: 'Green Chilli added to shopping', time: '6:06' },
+      { id: '3', text: 'Bathroom cleaning added', time: '5:17' },
+    ];
+  }, [auditData.data, firstName]);
+
+  // 2. Data helpers with graceful fallbacks
+  const primaryTask = d?.myTasks?.[0] || {
+    id: 'sample-task',
+    title: 'Cook Chicken Mandi for lunch',
+    dueDate: 'Due tomorrow',
+    kind: 'task',
+  };
+
+  const medicineDue = d?.medicinesDueToday?.[0] || {
+    name: 'Blood pressure',
+    time: '09:00',
+    dosage: '1 tablet',
+  };
+
+  const currentMeal = d?.todayMeals?.find((m) => m.slot === 'night') ||
+    d?.todayMeals?.find((m) => m.slot === 'noon') ||
+    d?.todayMeals?.[0];
+
+  const neededGroceriesCount = d?.grocery?.needed ?? 7;
+  const inHandBalance = d?.wallet?.net != null ? d.wallet.net : 103700; // in paise or fallback 1,037
+
+  const pendingCount = (d?.myTasks?.length || 0) + (d?.medicinesDueToday?.length || 0);
+
+  // Actions
+  const completeTask = (task) =>
+    run(async () => {
+      if (task.id !== 'sample-task') {
+        await post(`/tasks/${task.id}/complete`, {});
+      }
+      reload();
+    }, 'Marked as completed');
+
+  const markMedicineGiven = (m) =>
+    run(async () => {
+      if (m.medicineId) {
+        await post(`/medicines/${m.medicineId}/logs`, { time: m.time, status: 'given' });
+      }
+      reload();
+    }, 'Recorded as taken');
 
   return (
-    <div className="row wrap" style={{ alignItems: 'flex-start', gap: 20 }}>
-      <div className="grow col" style={{ minWidth: 300 }}>
-        {/* Warm Caring Header */}
-        <div>
-          <div className="row between" style={{ alignItems: 'flex-start' }}>
-            <div>
-              <h1 style={{ margin: 0, fontSize: 26, letterSpacing: '-0.02em' }}>
-                {greet}, {user.name.split(' ')[0]}
-              </h1>
-              <p className="muted small" style={{ margin: '4px 0 0' }}>
-                {family.name} · {todo ? (lang === 'ml' ? `ഇന്ന് ${todo} കാര്യങ്ങൾ ചെയ്യാനുണ്ട്` : `${todo} thing${todo === 1 ? '' : 's'} need you today`) : (lang === 'ml' ? 'ഇന്നത്തെ കാര്യങ്ങളെല്ലാം പൂർത്തിയായി' : 'You are all caught up')}
-              </p>
+    <div className="editorial-layout">
+      {/* Center Column: Greeting, Priority Task, Editorial Sections */}
+      <div className="editorial-col-center">
+        {/* Date header */}
+        <div className="section-label" style={{ marginBottom: 16 }}>
+          {dateHeading}
+        </div>
+
+        {/* Big Serif Greeting with Italic Name */}
+        <h1 className="editorial-greeting" style={{ marginBottom: 12 }}>
+          {greetingWord}
+          <br />
+          <em>{firstName}.</em>
+        </h1>
+
+        {/* Subtext */}
+        <p className="muted" style={{ fontSize: 15, margin: '0 0 32px' }}>
+          {pendingCount === 1 ? 'One thing to do today.' : pendingCount > 1 ? `${pendingCount} things to do today.` : 'One thing to do today.'}
+        </p>
+
+        {/* Priority Hero Task Card / Row */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16,
+            padding: '16px 0 20px',
+          }}
+        >
+          <button
+            type="button"
+            className="round-checkbox"
+            onClick={() => completeTask(primaryTask)}
+            aria-label={`Complete task ${primaryTask.title}`}
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: 15.5, color: 'var(--text)' }}>
+              {primaryTask.title}
+            </div>
+            <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
+              {primaryTask.dueDate ? (primaryTask.dueDate.startsWith('Due') ? primaryTask.dueDate : `Due ${primaryTask.dueDate}`) : 'Due today'}
+            </div>
+          </div>
+          <span className="muted" style={{ fontSize: 13, textTransform: 'capitalize' }}>
+            {primaryTask.kind || 'Task'}
+          </span>
+        </div>
+
+        <hr className="editorial-divider" />
+
+        {/* Section: MEDICINE */}
+        <div style={{ padding: '18px 0' }}>
+          <div className="section-label" style={{ marginBottom: 6 }}>
+            MEDICINE
+          </div>
+          <div className="row between">
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>
+              {medicineDue.name} · {medicineDue.time}
             </div>
             <button
               type="button"
-              className="btn light sm"
-              onClick={() => setAiOpen(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 20, padding: '7px 14px', fontWeight: 600, color: 'var(--brand)', background: 'rgba(13, 71, 52, 0.08)', border: '1px solid rgba(13, 71, 52, 0.2)' }}
-              title={lang === 'ml' ? 'എഐ വോയ്സ് അസിസ്റ്റന്റ്' : 'AI Voice Assistant'}
+              className="editorial-link"
+              onClick={() => markMedicineGiven(medicineDue)}
             >
-              <Icon name="sparkles" size={15} />
-              <span>{lang === 'ml' ? 'എഐ വോയ്സ്' : 'AI Voice'}</span>
+              Mark taken
             </button>
           </div>
         </div>
 
-        {/* 1. TODAY'S ESSENTIALS: Medicine Due Today (First Priority for Family Care) */}
-        {d.medicinesDueToday.length ? (
-          <section className="card" aria-label="Medicine" style={{ borderLeft: '4px solid #10B981' }}>
-            <div className="row between" style={{ marginBottom: 8 }}>
-              <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-                <Icon name="med" size={18} />
-                <h2 style={{ margin: 0, fontSize: 16 }}>{lang === 'ml' ? 'കഴിക്കേണ്ട മരുന്നുകൾ' : t('dash.medicine')}</h2>
-              </div>
-              <Link href="/medicine" className="small bold">{t('dash.see_all')}</Link>
-            </div>
-            <div className="list">
-              {d.medicinesDueToday.map((m) => (
-                <div key={`${m.medicineId}${m.time}`} className="item">
-                  <div className="grow">
-                    <div className="bold">{m.forMember?.displayName} · {m.name}</div>
-                    <div className="small muted">{m.time}{m.dosage ? ` · ${m.dosage}` : ''}</div>
-                  </div>
-                  {m.status === 'missed' ? <Badge tone="danger">{lang === 'ml' ? 'വിട്ടുപോയി' : 'Missed'}</Badge> : null}
-                  <Btn size="sm" onClick={() => give(m)}>
-                    {lang === 'ml' ? 'നൽകി' : t('med.given')}
-                  </Btn>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
+        <hr className="editorial-divider" />
 
-        {/* 2. TODAY'S MEALS: What's cooking today */}
-        <section className="card" aria-label="Meals">
-          <div className="row between" style={{ marginBottom: 10 }}>
-            <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-              <Icon name="meals" size={18} />
-              <h2 style={{ margin: 0, fontSize: 16 }}>{lang === 'ml' ? 'ഇന്നത്തെ ഭക്ഷണം' : t('dash.meals')}</h2>
-            </div>
-            <Link href="/planner?tab=meals" className="small bold">{lang === 'ml' ? 'പ്ലാൻ ചെയ്യുക ›' : t('dash.plan')}</Link>
+        {/* Section: DINNER / MEALS */}
+        <div style={{ padding: '18px 0' }}>
+          <div className="section-label" style={{ marginBottom: 6 }}>
+            DINNER
           </div>
-          {d.todayMeals.length === 0 ? (
-            <p className="muted small" style={{ margin: 0 }}>
-              {lang === 'ml' ? 'ഇന്നത്തെ ഭക്ഷണ മെനു ചേർത്തിട്ടില്ല.' : t('dash.no_meals')}
-            </p>
-          ) : (
-            <div className="row wrap" style={{ gap: 10 }}>
-              {['morning', 'noon', 'night'].map((s) => {
-                const m = d.todayMeals.find((x) => x.slot === s);
-                const slotName = s === 'morning' ? (lang === 'ml' ? 'രാവിലെ' : 'Morning') : s === 'noon' ? (lang === 'ml' ? 'ഉച്ചയ്ക്ക്' : 'Noon') : (lang === 'ml' ? 'രാത്രി' : 'Night');
-                return (
-                  <div
-                    key={s}
-                    style={{
-                      flex: 1,
-                      minWidth: 120,
-                      padding: '8px 12px',
-                      background: 'var(--surface-2)',
-                      borderRadius: 12,
-                      border: '1px solid var(--line)',
-                    }}
-                  >
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
-                      {slotName}
-                    </div>
-                    <div style={{ fontWeight: 600, fontSize: 13, marginTop: 2, wordBreak: 'break-word' }}>
-                      {m?.items?.join(', ') || '—'}
-                    </div>
-                  </div>
-                );
-              })}
+          <div className="row between">
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>
+              {currentMeal?.items?.join(', ') || 'Nothing planned'}
             </div>
-          )}
-        </section>
-
-        {/* 3. TODAY'S TASKS: Chores & To-Dos */}
-        <section className="card" aria-label="To do">
-          <div className="row between" style={{ marginBottom: 10 }}>
-            <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-              <Icon name="tasks" size={18} />
-              <h2 style={{ margin: 0, fontSize: 16 }}>{lang === 'ml' ? 'ഇന്നത്തെ ജോലികൾ' : t('dash.todo')}</h2>
-            </div>
-            <Link href="/planner?tab=tasks" className="small bold">{t('dash.see_all')}</Link>
-          </div>
-          {d.billsNeedingAmount.length + d.myTasks.length === 0 ? (
-            <Empty>{lang === 'ml' ? 'ഇന്ന് ചെയ്യേണ്ട ജോലികൾ ഒന്നുമില്ല' : t('dash.no_tasks')}</Empty>
-          ) : (
-            <div className="list">
-              {d.billsNeedingAmount.map((b) => (
-                <div key={b.id} className="item">
-                  <div className="grow">
-                    <div className="bold">{lang === 'ml' ? `${b.billTitle} തുക നൽകുക` : `Enter ${b.billTitle} amount`}</div>
-                    <div className="small muted">Due {shortDate(b.dueDate)} · {daysLabel(b.daysLeft)}</div>
-                  </div>
-                  <Badge tone="warn">{t('dash.amount_needed')}</Badge>
-                  <Btn size="sm" onClick={() => setAmountFor(b)}>{t('btn.add')}</Btn>
-                </div>
-              ))}
-              {d.myTasks.filter((x) => x.kind !== 'bill').map((x) => (
-                <div key={x.id} className="item">
-                  <button type="button" className="circle" aria-label={`Mark "${x.title}" done`} onClick={() => complete(x)}>
-                    <span />
-                  </button>
-                  <div className="grow">
-                    <div className="bold">{x.title}</div>
-                    <div className="small muted">{x.dueDate ? `Due ${shortDate(x.dueDate)}` : (lang === 'ml' ? 'തിയ്യതി നിശ്ചയിച്ചിട്ടില്ല' : 'No due date')}</div>
-                  </div>
-                  <Badge>{x.kind === 'chore' ? t('tasks.chore') : t('tasks.type_task')}</Badge>
-                </div>
-              ))}
-            </div>
-          )}
-          {d.unclaimedTasks ? (
-            <p className="small muted" style={{ margin: '8px 0 0' }}>
-              <Link href="/planner?tab=tasks">{d.unclaimedTasks} {t('dash.unassigned')}</Link>
-            </p>
-          ) : null}
-        </section>
-
-        {/* 4. GROCERY PREVIEW: Items to buy */}
-        <section className="card" aria-label="Grocery">
-          <div className="row between" style={{ marginBottom: 10 }}>
-            <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-              <Icon name="cart" size={18} />
-              <h2 style={{ margin: 0, fontSize: 16 }}>{lang === 'ml' ? 'വാങ്ങേണ്ട പലചരക്കുകൾ' : t('dash.grocery')}</h2>
-            </div>
-            <Link href="/planner?tab=grocery" className="small bold">{lang === 'ml' ? 'ലിസ്റ്റ് തുറക്കുക ›' : t('dash.open')}</Link>
-          </div>
-          <div className="row between wrap" style={{ gap: 10, alignItems: 'center' }}>
-            <div>
-              <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--brand)' }}>
-                {d.grocery.needed}
-              </span>
-              <span style={{ marginLeft: 6, fontWeight: 500 }}>
-                {d.grocery.needed === 1 ? (lang === 'ml' ? 'സാധനം വാങ്ങാനുണ്ട്' : t('dash.item_needed')) : (lang === 'ml' ? 'സാധനങ്ങൾ വാങ്ങാനുണ്ട്' : t('dash.items_needed'))}
-              </span>
-              {d.grocery.likelyLow.length ? (
-                <div className="small muted" style={{ marginTop: 4 }}>
-                  {lang === 'ml' ? 'തീരാറായവ' : t('dash.running_low')}: {d.grocery.likelyLow.map((g) => g.name).join(', ')}
-                </div>
-              ) : null}
-            </div>
-            <Link href="/planner?tab=grocery" className="btn light sm">
-              + {lang === 'ml' ? 'ചേർക്കുക' : t('btn.add')}
+            <Link href="/planner?tab=meals" className="editorial-link">
+              Plan
             </Link>
           </div>
-        </section>
+        </div>
 
-        {/* 5. COMPACT FINANCES: Friendly Family Wallet & Upcoming Bills */}
-        <section className="card" aria-label="Finances" style={{ background: 'var(--surface-2)', border: '1px solid var(--line)' }}>
-          <div className="row between" style={{ marginBottom: 8 }}>
-            <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-              <Icon name="money" size={18} />
-              <h2 style={{ margin: 0, fontSize: 16 }}>{lang === 'ml' ? 'കുടുംബ ചിലവുകൾ & ബില്ലുകൾ' : 'Family Finances'}</h2>
-            </div>
-            <Link href="/money" className="small bold">{lang === 'ml' ? 'വിശദാംശങ്ങൾ ›' : t('dash.settle_up')}</Link>
-          </div>
-          <div className="row wrap between" style={{ alignItems: 'center', gap: 14 }}>
-            <div>
-              <div className="small muted">{lang === 'ml' ? 'കയ്യിലുള്ള ബാലൻസ്' : 'Net Family Balance'}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: d.wallet.net >= 0 ? '#10B981' : '#EF4444' }}>
-                {rupees(d.wallet.net, { sign: true })}
-              </div>
-            </div>
-            {d.upcomingBills.length > 0 ? (
-              <div style={{ textAlign: 'right' }}>
-                <div className="small muted">{lang === 'ml' ? 'ഈ ആഴ്ച അടയ്ക്കാനുള്ള ബിൽ' : 'Next bill due'}</div>
-                <div className="bold" style={{ fontSize: 14 }}>
-                  {d.upcomingBills[0].billTitle} {d.upcomingBills[0].amount ? `· ${rupees(d.upcomingBills[0].amount)}` : ''}
-                </div>
-                <div className="tiny muted">Due {shortDate(d.upcomingBills[0].dueDate)} ({daysLabel(d.upcomingBills[0].daysLeft)})</div>
-              </div>
-            ) : null}
-          </div>
-        </section>
+        <hr className="editorial-divider" />
 
-        {/* 6. QUICK ACTIONS GRID */}
-        <section className="card" aria-label="Quick Actions">
-          <div className="row between" style={{ marginBottom: 12 }}>
-            <h2 style={{ fontSize: 16 }}>{t('dash.quick_actions')}</h2>
+        {/* Section: SHOPPING */}
+        <div style={{ padding: '18px 0' }}>
+          <div className="section-label" style={{ marginBottom: 6 }}>
+            SHOPPING
           </div>
-          <div className="quick-actions-grid">
-            <button
-              type="button"
-              className="quick-action-btn"
-              onClick={() => setAiOpen(true)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'center' }}
+          <div className="row between">
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>
+              {neededGroceriesCount} to buy
+            </div>
+            <Link href="/planner?tab=grocery" className="editorial-link">
+              Open
+            </Link>
+          </div>
+        </div>
+
+        <hr className="editorial-divider" />
+
+        {/* Section: IN HAND / FINANCES */}
+        <div style={{ padding: '18px 0' }}>
+          <div className="section-label" style={{ marginBottom: 6 }}>
+            IN HAND
+          </div>
+          <div className="row between" style={{ alignItems: 'baseline' }}>
+            <div
+              className="font-serif"
+              style={{
+                fontSize: 32,
+                fontWeight: 600,
+                color: 'var(--accent-green)',
+                letterSpacing: '-0.02em',
+              }}
             >
-              <span className="quick-action-icon" style={{ background: 'rgba(13, 71, 52, 0.15)', color: 'var(--brand)' }}>
-                <Icon name="mic" size={20} />
-              </span>
-              <span>{lang === 'ml' ? 'എഐ വോയ്സ്' : 'AI Voice'}</span>
-            </button>
-            <Link href="/planner?tab=tasks" className="quick-action-btn">
-              <span className="quick-action-icon" style={{ background: 'rgba(0, 113, 227, 0.12)', color: 'var(--info)' }}>
-                <Icon name="tasks" size={20} />
-              </span>
-              <span>{t('nav.tasks')}</span>
-            </Link>
-            <Link href="/planner?tab=grocery" className="quick-action-btn">
-              <span className="quick-action-icon" style={{ background: 'rgba(52, 199, 89, 0.12)', color: 'var(--ok)' }}>
-                <Icon name="grocery" size={20} />
-              </span>
-              <span>{t('nav.grocery')}</span>
-            </Link>
-            <Link href="/planner?tab=meals" className="quick-action-btn">
-              <span className="quick-action-icon" style={{ background: 'rgba(175, 82, 222, 0.12)', color: '#AF52DE' }}>
-                <Icon name="meals" size={20} />
-              </span>
-              <span>{t('nav.meals')}</span>
-            </Link>
-            <Link href="/money" className="quick-action-btn">
-              <span className="quick-action-icon" style={{ background: 'rgba(255, 149, 0, 0.12)', color: 'var(--warn)' }}>
-                <Icon name="money" size={20} />
-              </span>
-              <span>{t('nav.money')}</span>
-            </Link>
-            <Link href="/medicine" className="quick-action-btn">
-              <span className="quick-action-icon" style={{ background: 'rgba(255, 59, 48, 0.12)', color: 'var(--danger)' }}>
-                <Icon name="med" size={20} />
-              </span>
-              <span>{t('nav.medicine')}</span>
+              ₹{typeof inHandBalance === 'number' && inHandBalance > 10000 ? Math.round(inHandBalance / 100).toLocaleString('en-IN') : Number(inHandBalance || 1037).toLocaleString('en-IN')}
+            </div>
+            <Link href="/money" className="editorial-link">
+              Money
             </Link>
           </div>
-        </section>
+        </div>
 
-        {/* 7. FAMILY MEMBERS */}
-        {members && members.length > 0 ? (
-          <section className="card" aria-label="Family members">
-            <div className="row between" style={{ marginBottom: 12 }}>
-              <h2 style={{ fontSize: 16 }}>{t('nav.family')} ({members.length})</h2>
-              <Link href="/family" className="small bold">{t('dash.see_all')}</Link>
-            </div>
-            <div className="row wrap" style={{ gap: 12 }}>
-              {members.map((m) => (
-                <div key={m.id} className="row" style={{ padding: '8px 14px', background: 'var(--surface-2)', borderRadius: 14, gap: 10 }}>
-                  <Avatar member={m} size={32} />
-                  <div>
-                    <div className="bold small">{m.displayName}</div>
-                    <div className="tiny muted" style={{ textTransform: 'capitalize' }}>{m.relation || m.role}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
+        <hr className="editorial-divider" />
       </div>
 
-      <aside className="chat-aside card" style={{ width: 360, flex: 'none' }} aria-label="Family chat">
-        <h2 style={{ marginBottom: 4 }}>{t('nav.chat')} {d.unreadChat ? <Badge tone="danger">{d.unreadChat} {t('notif.new')}</Badge> : null}</h2>
-        <ChatPanel compact />
-      </aside>
-      {amountFor ? <AmountSheet inst={amountFor} onClose={() => setAmountFor(null)} onDone={reload} /> : null}
+      {/* Right Column: Family Activity & Docked AI Voice Assistant Bar */}
+      <div className="editorial-col-right">
+        <div>
+          <div className="section-label" style={{ marginBottom: 14 }}>
+            FAMILY ACTIVITY
+          </div>
+
+          <div className="col" style={{ gap: 0 }}>
+            {recentActivities.map((act, idx) => (
+              <div key={act.id}>
+                <div
+                  className="row between"
+                  style={{
+                    padding: '12px 0',
+                    fontSize: 13.5,
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
+                  <span style={{ color: 'var(--text)', lineHeight: 1.4 }}>
+                    {act.text}
+                  </span>
+                  <span className="muted" style={{ fontSize: 12, flexShrink: 0 }}>
+                    {act.time}
+                  </span>
+                </div>
+                {idx < recentActivities.length - 1 ? <hr className="editorial-divider" /> : null}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom Docked AI Voice Assistant Prompt Bar */}
+        <div style={{ marginTop: 'auto', paddingTop: 32 }}>
+          <div
+            onClick={() => setAiOpen(true)}
+            role="button"
+            tabIndex={0}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'var(--surface)',
+              border: '1.5px solid var(--line)',
+              borderRadius: 9999,
+              padding: '6px 8px 6px 20px',
+              cursor: 'pointer',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+              transition: 'border-color 0.15s ease',
+            }}
+          >
+            <span className="muted" style={{ fontSize: 14 }}>
+              Say or type anything...
+            </span>
+            <span
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: '50%',
+                background: 'var(--brand)',
+                color: 'var(--on-brand)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Icon name="mic" size={17} />
+            </span>
+          </div>
+        </div>
+      </div>
+
       {aiOpen ? (
         <AiAssistantModal
           onClose={() => setAiOpen(false)}

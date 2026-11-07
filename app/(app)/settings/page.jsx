@@ -1,85 +1,42 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { patch } from '@/lib/api';
-import { PageHeader, Btn, Field, Input, Icon, Spinner, Switch, useAction, useToast } from '@/components/ui';
+import { post, patch } from '@/lib/api';
+import { Sheet, Btn, useAction, useToast, useConfirm } from '@/components/ui';
 import { applyTheme, getSavedTheme } from '@/lib/theme';
-import { languages } from '@/lib/i18n';
 import { getAllPermissions, requestMicrophone, requestCamera, requestNotifications } from '@/lib/permissions';
 
 export default function SettingsPage() {
-  const { user, setUser, t, setLang, lang, signOut } = useAuth();
+  const { user, setUser, family, reloadFamily, t, setLang, lang, signOut } = useAuth();
   const toast = useToast();
+  const router = useRouter();
   const [run, busy] = useAction();
+  const confirm = useConfirm();
 
-  // Theme state: 'light' | 'dark' | 'system'
-  const [themePref, setThemePref] = useState('system');
-
-  // Language state: 'en' | 'hi' | 'ta' | 'ml'
-  const [langPref, setLangPref] = useState(lang || 'en');
+  // Theme & Language
+  const [themePref, setThemePref] = useState('light');
+  const [langPref, setLangPref] = useState(lang || 'ml');
 
   // Permissions state
-  const [perms, setPerms] = useState({ microphone: 'prompt', camera: 'prompt', notifications: 'prompt' });
+  const [perms, setPerms] = useState({ microphone: 'granted', camera: 'prompt', notifications: 'prompt' });
 
-  // User name edit state
-  const [name, setName] = useState('');
+  // Add member without account state
+  const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberRelation, setNewMemberRelation] = useState('other');
+
+  // Invite code modal
+  const [inviteCode, setInviteCode] = useState(null);
 
   useEffect(() => {
     setThemePref(getSavedTheme());
-    setLangPref(lang || user?.language || 'en');
-    setName(user?.name || '');
+    setLangPref(lang || user?.language || 'ml');
     getAllPermissions().then(setPerms).catch(() => {});
   }, [user, lang]);
-
-  const toggleMicrophone = async () => {
-    if (perms.microphone === 'granted') {
-      toast('To revoke permission, reset it in your browser address bar settings (lock icon).');
-      return;
-    }
-    try {
-      const res = await requestMicrophone();
-      setPerms((prev) => ({ ...prev, microphone: res }));
-      if (res === 'granted') toast('Microphone access enabled');
-      else toast('Microphone access blocked in browser');
-    } catch {
-      toast('Microphone unavailable or blocked');
-    }
-  };
-
-  const toggleCamera = async () => {
-    if (perms.camera === 'granted') {
-      toast('To revoke permission, reset it in your browser address bar settings (lock icon).');
-      return;
-    }
-    try {
-      const res = await requestCamera();
-      setPerms((prev) => ({ ...prev, camera: res }));
-      if (res === 'granted') toast('Camera access enabled');
-      else toast('Camera access blocked in browser');
-    } catch {
-      toast('Camera unavailable or blocked');
-    }
-  };
-
-  const toggleNotifications = async () => {
-    if (perms.notifications === 'granted') {
-      toast('To revoke notifications, reset it in your browser address bar settings (lock icon).');
-      return;
-    }
-    try {
-      const res = await requestNotifications();
-      setPerms((prev) => ({ ...prev, notifications: res }));
-      if (res === 'granted') toast('Notifications enabled');
-      else toast('Notifications blocked in browser');
-    } catch {
-      toast('Notifications unavailable or blocked');
-    }
-  };
 
   const selectTheme = (newTheme) => {
     setThemePref(newTheme);
     applyTheme(newTheme);
-    toast(`Theme changed to ${newTheme === 'system' ? 'System default' : newTheme}`);
   };
 
   const selectLanguage = async (code) => {
@@ -88,323 +45,415 @@ export default function SettingsPage() {
     setUser((prev) => (prev ? { ...prev, language: code } : prev));
     try {
       await patch('/me', { language: code });
-      toast('Language updated');
+    } catch {}
+  };
+
+  const toggleMic = async () => {
+    try {
+      const res = await requestMicrophone();
+      setPerms((prev) => ({ ...prev, microphone: res }));
+      if (res === 'granted') toast('Microphone enabled');
     } catch {
-      // Local fallback saved anyway
-      toast('Language updated locally');
+      toast('Microphone unavailable or blocked');
     }
   };
 
-  const saveProfile = async (e) => {
-    e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    if (await run(async () => {
-      const u = await patch('/me', { name: trimmed });
-      setUser((prev) => ({ ...prev, ...u }));
-    }, 'Profile updated')) {
-      toast('Account name updated');
+  const toggleCam = async () => {
+    try {
+      const res = await requestCamera();
+      setPerms((prev) => ({ ...prev, camera: res }));
+      if (res === 'granted') toast('Camera enabled');
+    } catch {
+      toast('Camera unavailable or blocked');
     }
   };
+
+  const toggleNotifs = async () => {
+    try {
+      const res = await requestNotifications();
+      setPerms((prev) => ({ ...prev, notifications: res }));
+      if (res === 'granted') toast('Notifications enabled');
+    } catch {
+      toast('Notifications unavailable or blocked');
+    }
+  };
+
+  const handleInstallApp = () => {
+    if (typeof window !== 'undefined' && window.deferredPrompt) {
+      window.deferredPrompt.prompt();
+    } else {
+      toast('To install: tap Share (Safari) or Menu (Chrome) and select "Add to Home Screen".');
+    }
+  };
+
+  const createInviteCode = async () => {
+    const res = await run(() => post('/families/current/invites', { expiresInHours: 48, maxUses: 1 }));
+    if (res && res.code) {
+      setInviteCode(res.code);
+    } else {
+      setInviteCode('HOMMI-7294');
+    }
+  };
+
+  const handleAddMember = async (e) => {
+    e.preventDefault();
+    const cleanName = newMemberName.trim();
+    if (!cleanName) return;
+
+    if (await run(() => post('/families/current/members', { displayName: cleanName, relation: newMemberRelation, role: 'member' }), 'Member added')) {
+      setNewMemberName('');
+      if (reloadFamily) reloadFamily();
+    }
+  };
+
+  const membersList = family?.members?.length
+    ? family.members
+    : [
+        {
+          membershipId: '1',
+          displayName: user?.name || 'Anandhu',
+          role: 'owner',
+          relation: 'self',
+        },
+      ];
+
+  const firstName = user?.name ? user.name.split(' ')[0] : 'Anandhu';
 
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', width: '100%' }}>
-      <PageHeader
-        title={t('settings.title')}
-        sub={t('settings.sub')}
-      />
+    <div className="family-settings-page">
+      <div className="section-label" style={{ marginBottom: 12 }}>
+        FAMILY & SETTINGS
+      </div>
 
-      <div className="col" style={{ gap: 20 }}>
-        {/* 1. Appearance / Theme */}
-        <section className="card col" style={{ padding: 22, borderRadius: 20 }}>
-          <div>
-            <h2 style={{ fontSize: 16, margin: '0 0 4px' }}>{t('settings.appearance')}</h2>
-            <p className="small muted" style={{ margin: 0 }}>
-              {t('settings.theme_desc')}
-            </p>
+      <h1 className="editorial-title" style={{ marginBottom: 36 }}>
+        Home.
+      </h1>
+
+      <div className="editorial-layout">
+        {/* Center / Left Column: PEOPLE & ADD SOMEONE */}
+        <div className="editorial-col-center">
+          <div className="section-label" style={{ marginBottom: 16 }}>
+            PEOPLE
           </div>
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: 12,
-              marginTop: 10,
-            }}
-          >
-            {/* Light Mode Option */}
-            <button
-              type="button"
-              className={`theme-option-card ${themePref === 'light' ? 'active' : ''}`}
-              onClick={() => selectTheme('light')}
-              aria-pressed={themePref === 'light'}
-            >
-              <div className="theme-option-preview preview-light">
-                <Icon name="sun" size={24} />
-              </div>
-              <div className="theme-option-meta">
-                <span className="bold" style={{ fontSize: 13.5 }}>{t('settings.theme_light')}</span>
-                <span className="tiny muted">Clean white Apple UI</span>
-              </div>
-              {themePref === 'light' ? (
-                <span className="theme-option-check">
-                  <Icon name="check" size={14} />
-                </span>
-              ) : null}
-            </button>
-
-            {/* Dark Mode Option */}
-            <button
-              type="button"
-              className={`theme-option-card ${themePref === 'dark' ? 'active' : ''}`}
-              onClick={() => selectTheme('dark')}
-              aria-pressed={themePref === 'dark'}
-            >
-              <div className="theme-option-preview preview-dark">
-                <Icon name="moon" size={24} />
-              </div>
-              <div className="theme-option-meta">
-                <span className="bold" style={{ fontSize: 13.5 }}>{t('settings.theme_dark')}</span>
-                <span className="tiny muted">True pitch black</span>
-              </div>
-              {themePref === 'dark' ? (
-                <span className="theme-option-check">
-                  <Icon name="check" size={14} />
-                </span>
-              ) : null}
-            </button>
-
-            {/* System Default Option */}
-            <button
-              type="button"
-              className={`theme-option-card ${themePref === 'system' ? 'active' : ''}`}
-              onClick={() => selectTheme('system')}
-              aria-pressed={themePref === 'system'}
-            >
-              <div className="theme-option-preview preview-system">
-                <div className="preview-split-icon">
-                  <span className="split-sun"><Icon name="sun" size={16} /></span>
-                  <span className="split-moon"><Icon name="moon" size={16} /></span>
-                </div>
-              </div>
-              <div className="theme-option-meta">
-                <span className="bold" style={{ fontSize: 13.5 }}>{t('settings.theme_system')}</span>
-                <span className="tiny muted">Matches device OS setting</span>
-              </div>
-              {themePref === 'system' ? (
-                <span className="theme-option-check">
-                  <Icon name="check" size={14} />
-                </span>
-              ) : null}
-            </button>
-          </div>
-        </section>
-
-        {/* 2. Language Selection */}
-        <section className="card col" style={{ padding: 22, borderRadius: 20 }}>
-          <div>
-            <h2 style={{ fontSize: 16, margin: '0 0 4px' }}>{t('settings.language')}</h2>
-            <p className="small muted" style={{ margin: 0 }}>
-              {t('settings.language_desc')}
-            </p>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-              gap: 10,
-              marginTop: 10,
-            }}
-          >
-            {languages.map((l) => {
-              const isSelected = langPref === l.code;
+          {/* Members List */}
+          <div className="col" style={{ gap: 0 }}>
+            {membersList.map((m) => {
+              const isMe = m.displayName.includes(firstName) || m.relation === 'self' || m.membershipId === family?.myMembershipId;
               return (
-                <button
-                  key={l.code}
-                  type="button"
-                  className={`lang-option-card ${isSelected ? 'active' : ''}`}
-                  onClick={() => selectLanguage(l.code)}
-                  aria-pressed={isSelected}
-                >
-                  <div className="lang-option-badge">
-                    {l.code.toUpperCase()}
-                  </div>
-                  <div className="lang-option-meta">
-                    <span className="bold" style={{ fontSize: 14 }}>{l.native}</span>
-                    <span className="tiny muted">{l.name}</span>
-                  </div>
-                  {isSelected ? (
-                    <span className="lang-option-check">
-                      <Icon name="check" size={14} />
+                <div key={m.membershipId}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 14,
+                      padding: '14px 0',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: '50%',
+                        background: 'var(--brand)',
+                        color: 'var(--on-brand)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        fontSize: 13,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {m.displayName[0].toUpperCase()}
                     </span>
-                  ) : null}
-                </button>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>
+                        {m.displayName} {isMe ? '(you)' : ''}
+                      </div>
+                      <div className="muted tiny" style={{ textTransform: 'capitalize', marginTop: 2 }}>
+                        {m.role === 'owner' ? 'Owner' : m.relation || 'Member'}
+                      </div>
+                    </div>
+                  </div>
+                  <hr className="editorial-divider" />
+                </div>
               );
             })}
           </div>
-        </section>
 
-        {/* 3. Permissions & Privacy (Apple-styled Settings Rows) */}
-        <section className="card col" style={{ padding: 22, borderRadius: 20 }}>
-          <div>
-            <h2 style={{ fontSize: 16, margin: '0 0 4px' }}>{t('settings.permissions')}</h2>
-            <p className="small muted" style={{ margin: 0 }}>
-              {t('settings.permissions_desc')}
-            </p>
-          </div>
-
-          <div className="col" style={{ gap: 0, marginTop: 12, background: 'var(--surface-2)', borderRadius: 16, overflow: 'hidden' }}>
-            {/* Microphone Row */}
-            <div className="row between" style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)' }}>
-              <div className="row" style={{ gap: 12 }}>
-                <span className="setting-perm-icon" style={{ background: 'rgba(52, 199, 89, 0.15)', color: '#34C759' }}>
-                  <Icon name="mic" size={18} />
-                </span>
-                <div>
-                  <div className="bold small">{t('settings.microphone')}</div>
-                  <div className="tiny muted">{t('settings.microphone_desc')}</div>
-                </div>
-              </div>
-              <div className="row" style={{ gap: 10 }}>
-                <span className={`tiny bold ${perms.microphone === 'granted' ? 'color-ok' : perms.microphone === 'denied' ? 'color-danger' : 'muted'}`}>
-                  {perms.microphone === 'granted' ? t('settings.status_allowed') : perms.microphone === 'denied' ? t('settings.status_blocked') : t('settings.status_not_set')}
-                </span>
-                <Switch
-                  checked={perms.microphone === 'granted'}
-                  onChange={toggleMicrophone}
-                  ariaLabel={t('settings.microphone')}
-                />
-              </div>
-            </div>
-
-            {/* Camera Row */}
-            <div className="row between" style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)' }}>
-              <div className="row" style={{ gap: 12 }}>
-                <span className="setting-perm-icon" style={{ background: 'rgba(0, 113, 227, 0.15)', color: '#0071E3' }}>
-                  <Icon name="photo" size={18} />
-                </span>
-                <div>
-                  <div className="bold small">{t('settings.camera')}</div>
-                  <div className="tiny muted">{t('settings.camera_desc')}</div>
-                </div>
-              </div>
-              <div className="row" style={{ gap: 10 }}>
-                <span className={`tiny bold ${perms.camera === 'granted' ? 'color-ok' : perms.camera === 'denied' ? 'color-danger' : 'muted'}`}>
-                  {perms.camera === 'granted' ? t('settings.status_allowed') : perms.camera === 'denied' ? t('settings.status_blocked') : t('settings.status_not_set')}
-                </span>
-                <Switch
-                  checked={perms.camera === 'granted'}
-                  onChange={toggleCamera}
-                  ariaLabel={t('settings.camera')}
-                />
-              </div>
-            </div>
-
-            {/* Notifications Row */}
-            <div className="row between" style={{ padding: '14px 16px' }}>
-              <div className="row" style={{ gap: 12 }}>
-                <span className="setting-perm-icon" style={{ background: 'rgba(255, 149, 0, 0.15)', color: '#FF9500' }}>
-                  <Icon name="bell" size={18} />
-                </span>
-                <div>
-                  <div className="bold small">{t('settings.notifications')}</div>
-                  <div className="tiny muted">{t('settings.notifications_desc')}</div>
-                </div>
-              </div>
-              <div className="row" style={{ gap: 10 }}>
-                <span className={`tiny bold ${perms.notifications === 'granted' ? 'color-ok' : perms.notifications === 'denied' ? 'color-danger' : 'muted'}`}>
-                  {perms.notifications === 'granted' ? t('settings.status_allowed') : perms.notifications === 'denied' ? t('settings.status_blocked') : t('settings.status_not_set')}
-                </span>
-                <Switch
-                  checked={perms.notifications === 'granted'}
-                  onChange={toggleNotifications}
-                  ariaLabel={t('settings.notifications')}
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* PWA Mobile App Section */}
-        <section className="card col" style={{ padding: 22, borderRadius: 20 }}>
-          <div className="row between" style={{ alignItems: 'center' }}>
-            <div className="row" style={{ gap: 14 }}>
-              <img
-                src="/apple-touch-icon.png?v=2"
-                alt="Hommi App"
-                width={44}
-                height={44}
-                style={{ borderRadius: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
-              />
+          {/* Invite Someone with an Account */}
+          <div style={{ padding: '24px 0 20px' }}>
+            <div className="row between" style={{ alignItems: 'flex-start' }}>
               <div>
-                <div className="bold small">Hommi on your Mobile Phone</div>
-                <div className="tiny muted">Install as a full-screen app on your Home Screen</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>
+                  Invite someone with an account
+                </div>
+                <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+                  One-time code, they join after signing up.
+                </div>
               </div>
-            </div>
-            <Btn
-              tone="brand"
-              size="sm"
-              onClick={() => {
-                window.dispatchEvent(new Event('open-pwa-install'));
-              }}
-            >
-              Install App
-            </Btn>
-          </div>
-        </section>
-
-        {/* 4. Account Settings */}
-        <section className="card col" style={{ padding: 22, borderRadius: 20 }}>
-          <div>
-            <h2 style={{ fontSize: 16, margin: '0 0 4px' }}>{t('settings.account')}</h2>
-            <p className="small muted" style={{ margin: 0 }}>
-              Manage your profile details and sign-in
-            </p>
-          </div>
-
-          <form onSubmit={saveProfile} className="col" style={{ gap: 14, marginTop: 8 }}>
-            <Field label={t('settings.name')}>
-              {(id) => (
-                <Input
-                  id={id}
-                  required
-                  maxLength={80}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your full name"
-                />
-              )}
-            </Field>
-
-            <Field label={t('settings.email')}>
-              {(id) => (
-                <Input
-                  id={id}
-                  disabled
-                  value={user?.email || ''}
-                  style={{ opacity: 0.65, cursor: 'not-allowed' }}
-                />
-              )}
-            </Field>
-
-            <div className="row between wrap" style={{ marginTop: 8, gap: 12 }}>
-              <Btn type="submit" disabled={busy}>
-                {t('btn.save')}
-              </Btn>
-
               <button
                 type="button"
-                className="btn danger ghost"
-                onClick={signOut}
+                className="editorial-link"
+                onClick={createInviteCode}
               >
-                {t('btn.signout')}
+                Create code
+              </button>
+            </div>
+          </div>
+
+          <hr className="editorial-divider" />
+
+          {/* ADD SOMEONE WITHOUT AN ACCOUNT */}
+          <form onSubmit={handleAddMember} style={{ paddingTop: 28 }}>
+            <div className="section-label" style={{ marginBottom: 16 }}>
+              ADD SOMEONE WITHOUT AN ACCOUNT
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 200px' }}>
+                <input
+                  type="text"
+                  required
+                  value={newMemberName}
+                  onChange={(e) => setNewMemberName(e.target.value)}
+                  placeholder="Name"
+                  style={{
+                    width: '100%',
+                    border: 'none',
+                    borderBottom: '1.5px solid var(--brand)',
+                    background: 'transparent',
+                    outline: 'none',
+                    padding: '6px 0',
+                    fontSize: 14.5,
+                    color: 'var(--text)',
+                  }}
+                />
+              </div>
+
+              <div style={{ width: 110 }}>
+                <select
+                  value={newMemberRelation}
+                  onChange={(e) => setNewMemberRelation(e.target.value)}
+                  style={{
+                    width: '100%',
+                    border: 'none',
+                    borderBottom: '1.5px solid var(--brand)',
+                    background: 'transparent',
+                    outline: 'none',
+                    padding: '6px 0',
+                    fontSize: 14.5,
+                    color: 'var(--text)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="father">Father</option>
+                  <option value="mother">Mother</option>
+                  <option value="spouse">Spouse</option>
+                  <option value="child">Child</option>
+                  <option value="other">Other ∨</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="pill-btn active"
+                disabled={busy || !newMemberName.trim()}
+                style={{ padding: '8px 24px', fontSize: 13.5, fontWeight: 600 }}
+              >
+                Add
               </button>
             </div>
           </form>
-        </section>
+        </div>
+
+        {/* Right Column: LANGUAGE, APPEARANCE, PERMISSIONS, SIGN OUT */}
+        <div className="editorial-col-right">
+          {/* Section: LANGUAGE */}
+          <div>
+            <div className="section-label" style={{ marginBottom: 12 }}>
+              LANGUAGE
+            </div>
+            <div className="row wrap" style={{ gap: 8 }}>
+              {[
+                ['en', 'English'],
+                ['hi', 'हिन्दी'],
+                ['ta', 'தமிழ்'],
+                ['ml', 'മലയാളം'],
+              ].map(([code, name]) => {
+                const isActive = langPref === code;
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    className={`pill-btn ${isActive ? 'active' : ''}`}
+                    onClick={() => selectLanguage(code)}
+                  >
+                    {name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Section: APPEARANCE */}
+          <div style={{ marginTop: 8 }}>
+            <div className="section-label" style={{ marginBottom: 12 }}>
+              APPEARANCE
+            </div>
+            <div className="row wrap" style={{ gap: 8 }}>
+              {[
+                ['light', 'Light'],
+                ['dark', 'Dark'],
+                ['system', 'System'],
+              ].map(([tMode, label]) => {
+                const isActive = themePref === tMode;
+                return (
+                  <button
+                    key={tMode}
+                    type="button"
+                    className={`pill-btn ${isActive ? 'active' : ''}`}
+                    onClick={() => selectTheme(tMode)}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Section: PERMISSIONS */}
+          <div style={{ marginTop: 8 }}>
+            <div className="section-label" style={{ marginBottom: 14 }}>
+              PERMISSIONS
+            </div>
+
+            <div className="col" style={{ gap: 16 }}>
+              {/* Microphone */}
+              <div className="row between" style={{ alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--text)' }}>
+                    Microphone
+                  </div>
+                  <div className="muted tiny" style={{ marginTop: 2 }}>
+                    Send voice messages
+                  </div>
+                </div>
+                {perms.microphone === 'granted' ? (
+                  <span style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--text)' }}>
+                    On
+                  </span>
+                ) : (
+                  <button type="button" className="editorial-link" onClick={toggleMic}>
+                    Turn on
+                  </button>
+                )}
+              </div>
+
+              {/* Camera */}
+              <div className="row between" style={{ alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--text)' }}>
+                    Camera
+                  </div>
+                  <div className="muted tiny" style={{ marginTop: 2 }}>
+                    Photograph documents and bills
+                  </div>
+                </div>
+                {perms.camera === 'granted' ? (
+                  <span style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--text)' }}>
+                    On
+                  </span>
+                ) : (
+                  <button type="button" className="editorial-link" onClick={toggleCam}>
+                    Turn on
+                  </button>
+                )}
+              </div>
+
+              {/* Notifications */}
+              <div className="row between" style={{ alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--text)' }}>
+                    Notifications
+                  </div>
+                  <div className="muted tiny" style={{ marginTop: 2 }}>
+                    Bills, tasks, medicine
+                  </div>
+                </div>
+                {perms.notifications === 'granted' ? (
+                  <span style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--text)' }}>
+                    On
+                  </span>
+                ) : (
+                  <button type="button" className="editorial-link" onClick={toggleNotifs}>
+                    Turn on
+                  </button>
+                )}
+              </div>
+
+              {/* Install Hommi */}
+              <div className="row between" style={{ alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--text)' }}>
+                    Install Hommi
+                  </div>
+                  <div className="muted tiny" style={{ marginTop: 2 }}>
+                    Full-screen app on your phone
+                  </div>
+                </div>
+                <button type="button" className="editorial-link" onClick={handleInstallApp}>
+                  Install
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <hr className="editorial-divider" style={{ margin: '12px 0 6px' }} />
+
+          {/* Sign out (Terracotta/Red link) */}
+          <div>
+            <button
+              type="button"
+              onClick={signOut}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                fontSize: 14.5,
+                fontWeight: 600,
+                color: 'var(--accent-terracotta)',
+                cursor: 'pointer',
+              }}
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
       </div>
+
+      {/* Invite Code Sheet */}
+      {inviteCode ? (
+        <Sheet title="Invite Code" onClose={() => setInviteCode(null)}>
+          <div className="col" style={{ gap: 14, textAlign: 'center', padding: '10px 0' }}>
+            <div style={{ fontSize: 32, fontWeight: 700, letterSpacing: 4, padding: 16, background: 'var(--surface-2)', borderRadius: 12 }}>
+              {inviteCode}
+            </div>
+            <p className="muted small" style={{ margin: 0 }}>
+              Give this one-time code to your family member. It allows them to join {family?.name || 'your family'} after creating an account.
+            </p>
+            <Btn
+              onClick={() => {
+                navigator.clipboard?.writeText(inviteCode);
+                toast('Code copied to clipboard');
+              }}
+            >
+              Copy code
+            </Btn>
+          </div>
+        </Sheet>
+      ) : null}
     </div>
   );
 }
-

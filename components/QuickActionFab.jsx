@@ -3,75 +3,36 @@ import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { post } from '@/lib/api';
-import { Sheet, Btn, Field, Input, Select, MemberSelect, Icon, useAction, useToast } from '@/components/ui';
+import { Icon, useAction, useToast } from '@/components/ui';
 import { todayStr, toPaise } from '@/lib/format';
 import AiAssistantModal from './AiAssistantModal';
 
-const ECATS = ['grocery', 'food', 'bills', 'rent', 'tax', 'emi', 'medical', 'transport', 'shopping', 'education', 'entertainment', 'household', 'other'];
-
 export default function QuickActionFab() {
   const pathname = usePathname();
-  const { family, t, lang } = useAuth();
+  const { family, user } = useAuth();
   const toast = useToast();
-  const [open, setOpen] = useState(false);
-  const [sheet, setSheet] = useState(null); // 'ai' | 'grocery' | 'task' | 'expense'
   const [run, busy] = useAction();
 
-  // Quick Grocery Form State
-  const [gName, setGName] = useState('');
-  const [gQty, setGQty] = useState('');
+  const [aiOpen, setAiOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('expense'); // 'task' | 'expense' | 'medicine' | 'document' | 'special-day'
 
-  // Quick Task Form State
+  // Expense fields
+  const [eAmount, setEAmount] = useState('');
+  const [eCategory, setECategory] = useState('grocery');
+  const [eNote, setENote] = useState('');
+
+  // Task fields
   const [tTitle, setTTitle] = useState('');
-  const [tAssignee, setTAssignee] = useState(null);
   const [tDueDate, setTDueDate] = useState('');
 
-  // Quick Expense Form State
-  const [eAmount, setEAmount] = useState('');
-  const [eNote, setENote] = useState('');
-  const [eCategory, setECategory] = useState('other');
+  // Medicine fields
+  const [mName, setMName] = useState('');
+  const [mDosage, setMDosage] = useState('1 tablet');
+  const [mTime, setMTime] = useState('09:00');
 
-  // Don't show floating button on the chat page to avoid colliding with chat composer
-  if (pathname === '/chat') return null;
-
-  const saveGrocery = async (e) => {
-    e.preventDefault();
-    const items = gName.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean);
-    if (items.length === 0) return;
-    if (await run(async () => {
-      if (items.length === 1) {
-        const body = { name: items[0], status: 'needed' };
-        if (gQty.trim()) body.qty = gQty.trim();
-        await post('/grocery', body);
-      } else {
-        for (const item of items) {
-          await post('/grocery', { name: item, status: 'needed' });
-        }
-      }
-    }, `${items.length} item${items.length === 1 ? '' : 's'} added to grocery`)) {
-      setGName('');
-      setGQty('');
-      setSheet(null);
-    }
-  };
-
-  const saveTask = async (e) => {
-    e.preventDefault();
-    const tasks = tTitle.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean);
-    if (tasks.length === 0) return;
-    if (await run(async () => {
-      for (const title of tasks) {
-        const body = { title, kind: 'custom', assigneeId: tAssignee || null };
-        if (tDueDate) body.dueDate = tDueDate;
-        await post('/tasks', body);
-      }
-    }, `${tasks.length} task${tasks.length === 1 ? '' : 's'} created`)) {
-      setTTitle('');
-      setTAssignee(null);
-      setTDueDate('');
-      setSheet(null);
-    }
-  };
+  // Don't show floating mic button on /chat to avoid collision
+  const isChatPage = pathname === '/chat';
 
   const saveExpense = async (e) => {
     e.preventDefault();
@@ -88,237 +49,353 @@ export default function QuickActionFab() {
     if (await run(() => post('/expenses', body), 'Expense recorded')) {
       setEAmount('');
       setENote('');
-      setECategory('other');
-      setSheet(null);
+      setModalOpen(false);
+      window.location.reload();
     }
   };
 
+  const saveTask = async (e) => {
+    e.preventDefault();
+    if (!tTitle.trim()) return;
+    const body = { title: tTitle.trim(), kind: 'task' };
+    if (tDueDate) body.dueDate = tDueDate;
+    if (await run(() => post('/tasks', body), 'Task created')) {
+      setTTitle('');
+      setTDueDate('');
+      setModalOpen(false);
+      window.location.reload();
+    }
+  };
+
+  const saveMed = async (e) => {
+    e.preventDefault();
+    if (!mName.trim()) return;
+    const body = {
+      forId: family?.myMembershipId,
+      name: mName.trim(),
+      dosage: mDosage,
+      times: [mTime],
+      startDate: todayStr(),
+    };
+    if (await run(() => post('/medicines', body), 'Medicine added')) {
+      setMName('');
+      setModalOpen(false);
+      window.location.reload();
+    }
+  };
+
+  const firstName = user?.name ? user.name.split(' ')[0] : 'Anandhu';
+
   return (
     <>
-      {open ? (
-        <div
-          className="fab-backdrop"
-          onClick={() => setOpen(false)}
-          aria-hidden="true"
-        />
-      ) : null}
-
-      <div className={`fab-container ${open ? 'open' : ''}`}>
-        {open ? (
-          <div className="fab-menu" role="menu">
-            <button
-              type="button"
-              className="fab-item fab-item-ai"
-              onClick={() => { setOpen(false); setSheet('ai'); }}
-            >
-              <span className="fab-item-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="sparkles" size={18} />
-              </span>
-              <span className="fab-item-label">{lang === 'ml' ? 'എഐ വോയ്സ്' : 'AI Voice'}</span>
-            </button>
-            <button
-              type="button"
-              className="fab-item"
-              onClick={() => { setOpen(false); setSheet('grocery'); }}
-            >
-              <span className="fab-item-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="cart" size={18} />
-              </span>
-              <span className="fab-item-label">{lang === 'ml' ? '+ പലചരക്ക്' : '+ Grocery'}</span>
-            </button>
-            <button
-              type="button"
-              className="fab-item"
-              onClick={() => { setOpen(false); setSheet('task'); }}
-            >
-              <span className="fab-item-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="tasks" size={18} />
-              </span>
-              <span className="fab-item-label">{lang === 'ml' ? '+ ജോലി' : '+ Task'}</span>
-            </button>
-            <button
-              type="button"
-              className="fab-item"
-              onClick={() => { setOpen(false); setSheet('expense'); }}
-            >
-              <span className="fab-item-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="money" size={18} />
-              </span>
-              <span className="fab-item-label">{lang === 'ml' ? '+ ചിലവ്' : '+ Expense'}</span>
-            </button>
-          </div>
-        ) : null}
-
+      {/* Floating Circular Mic Button (Mobile) */}
+      {!isChatPage ? (
         <button
           type="button"
-          className={`fab-btn ${open ? 'active' : ''}`}
-          onClick={() => setOpen(!open)}
-          aria-label={open ? 'Close actions menu' : 'Quick add'}
-          title="Quick Add"
-        >
-          <span className="fab-icon-plus" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-            {open ? <Icon name="close" size={18} /> : <Icon name="plus" size={20} />}
-          </span>
-        </button>
-      </div>
-
-      {sheet === 'ai' ? (
-        <AiAssistantModal
-          onClose={() => setSheet(null)}
-          onDone={() => {
-            setSheet(null);
-            toast(lang === 'ml' ? 'ലിസ്റ്റിലേക്ക് ചേർത്തു' : 'Added to Hommi');
+          onClick={() => setAiOpen(true)}
+          className="mobile-only"
+          style={{
+            position: 'fixed',
+            right: 18,
+            bottom: 'calc(var(--nav-h) + 16px)',
+            width: 48,
+            height: 48,
+            borderRadius: '50%',
+            background: 'var(--brand)',
+            color: 'var(--on-brand)',
+            border: 'none',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.22)',
+            zIndex: 49,
+            cursor: 'pointer',
           }}
-        />
+          aria-label="Ask Hommi Voice Assistant"
+        >
+          <Icon name="mic" size={22} />
+        </button>
       ) : null}
 
-      {sheet === 'grocery' ? (
-        <Sheet
-          title={lang === 'ml' ? 'പലചരക്ക് സാധനം ചേർക്കുക' : 'Add Grocery Item'}
-          onClose={() => setSheet(null)}
-        >
-          <form className="col" onSubmit={saveGrocery}>
-            <Field
-              label={lang === 'ml' ? 'സാധനങ്ങളുടെ പേര് (ഒന്നിലധികം ഉണ്ടെങ്കിൽ കോമ നൽകാം)' : 'Items (separate multiple with commas)'}
-              hint={lang === 'ml' ? 'ഉദാ: പാൽ, മുട്ട, സവാള, തക്കാളി' : 'e.g. Milk, Eggs, Onions, Tomato'}
+      {/* Unified Add Modal (Image 5, Screen 5) */}
+      {modalOpen ? (
+        <div className="overlay" onClick={() => setModalOpen(false)}>
+          <div
+            className="sheet"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 460, borderRadius: '24px 24px 0 0', padding: '24px 24px 36px' }}
+          >
+            {/* Top Bar: NEW on left, Close on right */}
+            <div className="row between" style={{ marginBottom: 20 }}>
+              <span className="section-label" style={{ fontSize: 12 }}>
+                NEW
+              </span>
+              <button
+                type="button"
+                className="editorial-link"
+                style={{ fontSize: 14 }}
+                onClick={() => setModalOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Type selector pills: [Task] [Expense] [Medicine] [Document] [Special day] */}
+            <div
+              className="row wrap"
+              style={{ gap: 8, marginBottom: 28 }}
             >
-              {(id) => (
-                <textarea
-                  id={id}
-                  className="textarea"
+              {[
+                ['task', 'Task'],
+                ['expense', 'Expense'],
+                ['medicine', 'Medicine'],
+                ['document', 'Document'],
+                ['special-day', 'Special day'],
+              ].map(([tKey, label]) => {
+                const isActive = activeTab === tKey;
+                return (
+                  <button
+                    key={tKey}
+                    type="button"
+                    className={`pill-btn ${isActive ? 'active' : ''}`}
+                    onClick={() => setActiveTab(tKey)}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* If Expense is active */}
+            {activeTab === 'expense' ? (
+              <form onSubmit={saveExpense}>
+                <div className="section-label" style={{ marginBottom: 6 }}>
+                  AMOUNT
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: 20 }}>
+                  <span className="font-serif" style={{ fontSize: 44, fontWeight: 400, marginRight: 2 }}>
+                    ₹
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    autoFocus
+                    required
+                    value={eAmount}
+                    onChange={(e) => setEAmount(e.target.value)}
+                    placeholder="0"
+                    className="font-serif"
+                    style={{
+                      fontSize: 44,
+                      fontWeight: 400,
+                      border: 'none',
+                      background: 'transparent',
+                      outline: 'none',
+                      width: '100%',
+                      color: eAmount ? 'var(--text)' : 'var(--muted)',
+                      padding: 0,
+                    }}
+                  />
+                </div>
+
+                <div className="section-label" style={{ marginBottom: 8 }}>
+                  CATEGORY
+                </div>
+                <div className="row" style={{ gap: 8, marginBottom: 20 }}>
+                  {[
+                    ['grocery', 'Groceries'],
+                    ['bills', 'Bills'],
+                    ['other', 'Other'],
+                  ].map(([cKey, label]) => {
+                    const isActive = eCategory === cKey;
+                    return (
+                      <button
+                        key={cKey}
+                        type="button"
+                        className={`pill-btn ${isActive ? 'active' : ''}`}
+                        onClick={() => setECategory(cKey)}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Form fields */}
+                <div style={{ borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)', marginBottom: 24 }}>
+                  <div className="row between" style={{ padding: '12px 0' }}>
+                    <span className="muted" style={{ fontSize: 13.5 }}>Paid by</span>
+                    <span style={{ fontSize: 14, fontWeight: 600 }}>{firstName}</span>
+                  </div>
+                  <hr className="editorial-divider" />
+                  <div className="row between" style={{ padding: '12px 0' }}>
+                    <span className="muted" style={{ fontSize: 13.5 }}>Date</span>
+                    <span style={{ fontSize: 14, fontWeight: 600 }}>Today</span>
+                  </div>
+                  <hr className="editorial-divider" />
+                  <div className="row between" style={{ padding: '12px 0' }}>
+                    <span className="muted" style={{ fontSize: 13.5 }}>Split equally</span>
+                    <span style={{ fontSize: 14, fontWeight: 600 }}>Everyone</span>
+                  </div>
+                  <hr className="editorial-divider" />
+                  <div style={{ padding: '10px 0' }}>
+                    <input
+                      type="text"
+                      placeholder="Note (optional)"
+                      value={eNote}
+                      onChange={(e) => setENote(e.target.value)}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        outline: 'none',
+                        width: '100%',
+                        fontSize: 14,
+                        color: 'var(--text)',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="pill-btn active"
+                  disabled={busy || !eAmount}
+                  style={{ width: '100%', padding: '11px 0', fontSize: 14, fontWeight: 600 }}
+                >
+                  Add expense
+                </button>
+              </form>
+            ) : null}
+
+            {/* If Task is active */}
+            {activeTab === 'task' ? (
+              <form onSubmit={saveTask}>
+                <div className="section-label" style={{ marginBottom: 6 }}>
+                  TASK TITLE
+                </div>
+                <input
+                  type="text"
                   required
-                  rows={2}
-                  value={gName}
-                  onChange={(e) => setGName(e.target.value)}
-                  placeholder={lang === 'ml' ? 'പാൽ, മുട്ട, സവാള...' : 'Milk, Eggs, Onions...'}
                   autoFocus
-                />
-              )}
-            </Field>
-            <Field label={lang === 'ml' ? 'അളവ് (ഓപ്ഷണൽ)' : 'Quantity (optional)'}>
-              {(id) => (
-                <Input
-                  id={id}
-                  maxLength={40}
-                  value={gQty}
-                  onChange={(e) => setGQty(e.target.value)}
-                  placeholder="1 L, 500 g, 2 packets"
-                />
-              )}
-            </Field>
-            <Btn type="submit" disabled={busy || !gName.trim()}>
-              {lang === 'ml' ? 'ചേർക്കുക' : 'Add Item'}
-            </Btn>
-          </form>
-        </Sheet>
-      ) : null}
-
-      {sheet === 'task' ? (
-        <Sheet
-          title={lang === 'ml' ? 'പുതിയ ജോലി നൽകുക' : 'Add New Task'}
-          onClose={() => setSheet(null)}
-        >
-          <form className="col" onSubmit={saveTask}>
-            <Field
-              label={lang === 'ml' ? 'ജോലികൾ (ഒന്നിലധികം ഉണ്ടെങ്കിൽ കോമ നൽകാം)' : 'Tasks (separate multiple with commas)'}
-              hint={lang === 'ml' ? 'ഉദാ: ബാത്ത്റൂം വൃത്തിയാക്കൽ, വസ്ത്രങ്ങൾ അലക്കുക' : 'e.g. Clean kitchen, Wash clothes'}
-            >
-              {(id) => (
-                <textarea
-                  id={id}
-                  className="textarea"
-                  required
-                  rows={2}
+                  placeholder="e.g. Cook Chicken Mandi for lunch"
                   value={tTitle}
                   onChange={(e) => setTTitle(e.target.value)}
-                  placeholder={lang === 'ml' ? 'ബാത്ത്റൂം വൃത്തിയാക്കൽ, വസ്ത്രങ്ങൾ അലക്കുക...' : 'Clean kitchen, Wash clothes...'}
-                  autoFocus
+                  style={{
+                    width: '100%',
+                    border: 'none',
+                    borderBottom: '1.5px solid var(--brand)',
+                    background: 'transparent',
+                    outline: 'none',
+                    padding: '8px 0',
+                    fontSize: 16,
+                    color: 'var(--text)',
+                    marginBottom: 20,
+                  }}
                 />
-              )}
-            </Field>
-            <div className="row wrap">
-              <Field label={lang === 'ml' ? 'തിയ്യതി (Due Date)' : 'Due Date'}>
-                {(id) => (
-                  <Input
-                    id={id}
+
+                <div className="row between" style={{ padding: '12px 0', borderBottom: '1px solid var(--line)', marginBottom: 24 }}>
+                  <span className="muted" style={{ fontSize: 13.5 }}>Due Date</span>
+                  <input
                     type="date"
                     value={tDueDate}
                     onChange={(e) => setTDueDate(e.target.value)}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13.5 }}
                   />
-                )}
-              </Field>
-              <Field label={lang === 'ml' ? 'ആർക്കാണ് ചുമതല?' : 'Assign to'}>
-                {(id) => (
-                  <MemberSelect
-                    id={id}
-                    members={family?.members || []}
-                    value={tAssignee}
-                    onChange={setTAssignee}
-                    allowNone
-                    noneLabel={lang === 'ml' ? 'ആർക്കും എടുക്കാം' : 'Anyone can take it'}
+                </div>
+
+                <button
+                  type="submit"
+                  className="pill-btn active"
+                  disabled={busy || !tTitle.trim()}
+                  style={{ width: '100%', padding: '11px 0', fontSize: 14, fontWeight: 600 }}
+                >
+                  Add task
+                </button>
+              </form>
+            ) : null}
+
+            {/* If Medicine is active */}
+            {activeTab === 'medicine' ? (
+              <form onSubmit={saveMed}>
+                <div className="section-label" style={{ marginBottom: 6 }}>
+                  MEDICINE NAME
+                </div>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="e.g. Blood pressure"
+                  value={mName}
+                  onChange={(e) => setMName(e.target.value)}
+                  style={{
+                    width: '100%',
+                    border: 'none',
+                    borderBottom: '1.5px solid var(--brand)',
+                    background: 'transparent',
+                    outline: 'none',
+                    padding: '8px 0',
+                    fontSize: 16,
+                    color: 'var(--text)',
+                    marginBottom: 20,
+                  }}
+                />
+
+                <div className="row between" style={{ padding: '12px 0', borderBottom: '1px solid var(--line)', marginBottom: 12 }}>
+                  <span className="muted" style={{ fontSize: 13.5 }}>Dosage</span>
+                  <input
+                    type="text"
+                    value={mDosage}
+                    onChange={(e) => setMDosage(e.target.value)}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', textAlign: 'right', fontSize: 13.5 }}
                   />
-                )}
-              </Field>
-            </div>
-            <Btn type="submit" disabled={busy || !tTitle.trim()}>
-              {lang === 'ml' ? 'ചുമതലപ്പെടുത്തുക' : 'Create Task'}
-            </Btn>
-          </form>
-        </Sheet>
+                </div>
+
+                <div className="row between" style={{ padding: '12px 0', borderBottom: '1px solid var(--line)', marginBottom: 24 }}>
+                  <span className="muted" style={{ fontSize: 13.5 }}>Time</span>
+                  <input
+                    type="time"
+                    value={mTime}
+                    onChange={(e) => setMTime(e.target.value)}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13.5 }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="pill-btn active"
+                  disabled={busy || !mName.trim()}
+                  style={{ width: '100%', padding: '11px 0', fontSize: 14, fontWeight: 600 }}
+                >
+                  Add medicine
+                </button>
+              </form>
+            ) : null}
+
+            {activeTab === 'document' || activeTab === 'special-day' ? (
+              <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                <p className="muted" style={{ fontSize: 14 }}>
+                  Upload documents or add special days from the main menu.
+                </p>
+                <button
+                  type="button"
+                  className="pill-btn active"
+                  onClick={() => setModalOpen(false)}
+                >
+                  Done
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
       ) : null}
 
-      {sheet === 'expense' ? (
-        <Sheet
-          title={lang === 'ml' ? 'ചിലവ് രേഖപ്പെടുത്തുക' : 'Record Expense'}
-          onClose={() => setSheet(null)}
-        >
-          <form className="col" onSubmit={saveExpense}>
-            <Field label={lang === 'ml' ? 'തുക (₹)' : 'Amount (₹)'}>
-              {(id) => (
-                <Input
-                  id={id}
-                  inputMode="decimal"
-                  required
-                  value={eAmount}
-                  onChange={(e) => setEAmount(e.target.value)}
-                  placeholder="150"
-                  autoFocus
-                />
-              )}
-            </Field>
-            <Field label={lang === 'ml' ? 'വിവരണം' : 'Note / For what'}>
-              {(id) => (
-                <Input
-                  id={id}
-                  maxLength={150}
-                  value={eNote}
-                  onChange={(e) => setENote(e.target.value)}
-                  placeholder={lang === 'ml' ? 'ഉദാ: മീൻ വാങ്ങി, ഓട്ടോ ചാർജ്' : 'e.g. Bought vegetables, Auto fare'}
-                />
-              )}
-            </Field>
-            <Field label={lang === 'ml' ? 'വിഭാഗം' : 'Category'}>
-              {(id) => (
-                <Select
-                  id={id}
-                  value={eCategory}
-                  onChange={(e) => setECategory(e.target.value)}
-                >
-                  {ECATS.map((c) => (
-                    <option key={c} value={c}>
-                      {t(`cat.${c}`) || c}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-            <Btn type="submit" disabled={busy || !eAmount.trim()}>
-              {lang === 'ml' ? 'രേഖപ്പെടുത്തുക' : 'Save Expense'}
-            </Btn>
-          </form>
-        </Sheet>
+      {/* Voice Assistant Modal */}
+      {aiOpen ? (
+        <AiAssistantModal
+          onClose={() => setAiOpen(false)}
+          onDone={() => setAiOpen(false)}
+        />
       ) : null}
     </>
   );
 }
-
