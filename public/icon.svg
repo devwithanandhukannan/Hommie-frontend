@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- House with h-ascender -->
+  <path d="M 64 68 L 122 68 L 122 184.5 L 256 114 L 448 215 L 448 444 L 390 444 L 390 250 L 256 179.5 L 122 250 L 122 444 L 64 444 Z" fill="#C7BAAE" />
+  <!-- Joyful smile arc with soft rounded cheeks -->
+  <path d="M 160 320 Q 256 460 352 320" fill="none" stroke="#C7BAAE" stroke-width="54" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
