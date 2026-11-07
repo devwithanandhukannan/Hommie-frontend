@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { translateNotificationText } from '@/lib/i18n';
 import { Avatar, Icon, Spinner, useAction, useToast } from '@/components/ui';
 import { hhmm } from '@/lib/format';
+import AiAssistantModal from './AiAssistantModal';
 
 function formatDatePill(dateStr, lang = 'en') {
   if (!dateStr) return '';
@@ -147,6 +148,181 @@ function ChatAudio({ id, duration, isMe }) {
   );
 }
 
+function AiActionCard({ attachmentId, text, lang, t, onApplied }) {
+  const [state, setState] = useState('idle'); // 'idle' | 'loading' | 'scanned' | 'applied' | 'error'
+  const [analysis, setAnalysis] = useState(null);
+  const [selectedActions, setSelectedActions] = useState([]);
+  const [applying, setApplying] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const scan = async () => {
+    setState('loading');
+    setErrorMsg('');
+    try {
+      const res = await post('/ai/analyze', { attachmentId, text });
+      setAnalysis(res);
+      setSelectedActions(res.actions || []);
+      setState('scanned');
+    } catch (err) {
+      setErrorMsg(err.message || 'AI analysis failed');
+      setState('error');
+    }
+  };
+
+  const toggleAction = (act) => {
+    if (selectedActions.includes(act)) {
+      setSelectedActions((prev) => prev.filter((x) => x !== act));
+    } else {
+      setSelectedActions((prev) => [...prev, act]);
+    }
+  };
+
+  const apply = async () => {
+    if (selectedActions.length === 0) return;
+    setApplying(true);
+    try {
+      await post('/ai/apply', { actions: selectedActions, notifyInChat: true });
+      setState('applied');
+      if (onApplied) onApplied();
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to save items');
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const getActionIcon = (type) => {
+    switch (type) {
+      case 'grocery': return '🛒';
+      case 'bill': return '⚡';
+      case 'expense': return '💸';
+      case 'meal': return '🍲';
+      case 'medicine': return '💊';
+      default: return '📝';
+    }
+  };
+
+  if (state === 'idle') {
+    return (
+      <button
+        type="button"
+        className="ai-scan-trigger"
+        onClick={scan}
+        title={t('chat.ai_scan')}
+      >
+        <span>✨</span>
+        <span>{t('chat.ai_scan')}</span>
+      </button>
+    );
+  }
+
+  if (state === 'loading') {
+    return (
+      <div className="ai-scan-trigger" style={{ cursor: 'default', opacity: 0.85 }}>
+        <Spinner size={12} />
+        <span>{t('chat.ai_analyzing')}</span>
+      </div>
+    );
+  }
+
+  if (state === 'applied') {
+    return (
+      <div className="ai-applied-badge">
+        <span>✓</span>
+        <span>{t('chat.ai_added_badge')}</span>
+      </div>
+    );
+  }
+
+  if (state === 'error') {
+    return (
+      <div style={{ fontSize: 11, color: '#DC2626', marginTop: 4 }}>
+        {errorMsg} · <button type="button" onClick={scan} style={{ background: 'none', border: 'none', color: 'inherit', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>{lang === 'ml' ? 'വീണ്ടും ശ്രമിക്കുക' : 'Retry'}</button>
+      </div>
+    );
+  }
+
+  if (state === 'scanned' && analysis) {
+    return (
+      <div className="ai-action-card">
+        <div className="ai-card-header">
+          <span className="ai-card-badge">
+            <span>✨</span>
+            <span>{t('chat.ai_assistant')}</span>
+          </span>
+          <button
+            type="button"
+            className="ai-card-close"
+            onClick={() => setState('idle')}
+            title="Close"
+          >
+            ✕
+          </button>
+        </div>
+
+        {analysis.transcription ? (
+          <div className="ai-transcription-box">
+            "{analysis.transcription}"
+          </div>
+        ) : null}
+
+        {analysis.actions && analysis.actions.length > 0 ? (
+          <>
+            <div className="ai-chips-list">
+              {analysis.actions.map((act, idx) => {
+                const isSelected = selectedActions.includes(act);
+                return (
+                  <div
+                    key={idx}
+                    className={`ai-chip-item ${!isSelected ? 'deselected' : ''}`}
+                    onClick={() => toggleAction(act)}
+                  >
+                    <input
+                      type="checkbox"
+                      className="ai-chip-checkbox"
+                      checked={isSelected}
+                      onChange={() => {}}
+                      aria-label={`Select ${act.title}`}
+                    />
+                    <span className="ai-chip-icon">{getActionIcon(act.type)}</span>
+                    <span className="ai-chip-title">
+                      {act.title}
+                      {act.quantity ? ` (${act.quantity})` : ''}
+                      {act.amount ? ` (₹${act.amount})` : ''}
+                    </span>
+                    <span className="ai-chip-tag">{act.type}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              className="ai-apply-btn"
+              disabled={selectedActions.length === 0 || applying}
+              onClick={apply}
+            >
+              {applying ? (
+                <Spinner size={13} />
+              ) : (
+                <span>
+                  + {t('chat.ai_add_btn')} ({selectedActions.length})
+                </span>
+              )}
+            </button>
+          </>
+        ) : (
+          <div className="ai-summary-text">
+            {t('chat.ai_no_actions')}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return null;
+}
+
 const KIND_INFO = {
   task: { label: 'Task', icon: 'tasks', link: '/tasks', btnText: 'Open Task ›' },
   grocery: { label: 'Grocery', icon: 'grocery', link: '/grocery', btnText: 'Open Grocery ›' },
@@ -202,6 +378,8 @@ export default function ChatPanel({ compact = false }) {
 
   // Pill Bar Menu Popover state
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiTextTargetId, setAiTextTargetId] = useState(null);
 
   // Voice Recording state (Max 30s Countdown 30 -> 1)
   const [isRecording, setIsRecording] = useState(false);
@@ -719,18 +897,35 @@ export default function ChatPanel({ compact = false }) {
 
                       {/* Voice Note Player */}
                       {m.type === 'audio' && m.attachmentId ? (
-                        <ChatAudio id={m.attachmentId} duration={m.audioDuration} isMe={mine} />
+                        <>
+                          <ChatAudio id={m.attachmentId} duration={m.audioDuration} isMe={mine} />
+                          <AiActionCard attachmentId={m.attachmentId} lang={lang} t={t} onApplied={reloadFamily} />
+                        </>
                       ) : null}
 
                       {/* Text with @mentions */}
                       {m.text ? (
                         <div className="chat-text-content">{renderMessageText(m.text)}</div>
                       ) : null}
+
+                      {aiTextTargetId === m.id && m.text ? (
+                        <AiActionCard text={m.text} lang={lang} t={t} onApplied={reloadFamily} />
+                      ) : null}
                     </div>
 
                     <div className="chat-meta-row">
                       <span>{hhmm(m.createdAt)}</span>
                       {mine && m.readByCount ? <span> · {lang === 'ml' ? `${m.readByCount} പേർ കണ്ടു` : lang === 'ta' ? `${m.readByCount} பார்த்துள்ளனர்` : lang === 'hi' ? `${m.readByCount} ने देखा` : `Seen by ${m.readByCount}`}</span> : null}
+                      {m.text ? (
+                        <button
+                          type="button"
+                          className="meta-action-btn"
+                          onClick={() => setAiTextTargetId(aiTextTargetId === m.id ? null : m.id)}
+                          title={t('chat.ai_scan')}
+                        >
+                          ✨ AI
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         className="meta-action-btn"
@@ -766,6 +961,15 @@ export default function ChatPanel({ compact = false }) {
 
       {/* Refined Minimalist Action Chips (Image 1 Style Quick Pills) */}
       <div className="chat-chips-bar" aria-label="Quick actions">
+        <button
+          type="button"
+          className="chat-chip-pill"
+          style={{ background: 'rgba(13, 71, 52, 0.08)', color: 'var(--brand)', borderColor: 'rgba(13, 71, 52, 0.2)' }}
+          onClick={() => setAiModalOpen(true)}
+          title={t('chat.ai_voice_assistant')}
+        >
+          <span>✨</span> {lang === 'ml' ? 'എഐ വോയ്സ്' : 'AI Voice'}
+        </button>
         <button
           type="button"
           className="chat-chip-pill"
@@ -834,6 +1038,13 @@ export default function ChatPanel({ compact = false }) {
         {/* Floating More Actions Tray (...) */}
         {moreMenuOpen ? (
           <div className="pill-menu-popup">
+            <button
+              type="button"
+              className="pill-menu-item"
+              onClick={() => { setMoreMenuOpen(false); setAiModalOpen(true); }}
+            >
+              <span style={{ fontSize: 16 }}>✨</span> {t('chat.ai_voice_assistant')}
+            </button>
             <button
               type="button"
               className="pill-menu-item"
@@ -962,6 +1173,16 @@ export default function ChatPanel({ compact = false }) {
           </form>
         )}
       </div>
+
+      {aiModalOpen ? (
+        <AiAssistantModal
+          onClose={() => setAiModalOpen(false)}
+          onDone={() => {
+            setAiModalOpen(false);
+            reloadFamily().catch(() => {});
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { post } from '@/lib/api';
 import { useAuth, useData } from '@/lib/auth';
 import ChatPanel from '@/components/ChatPanel';
+import AiAssistantModal from '@/components/AiAssistantModal';
 import { Avatar, Badge, Btn, Empty, ErrorNote, Field, Icon, Input, Sheet, Spinner, useAction } from '@/components/ui';
 import { CATEGORY_LABEL, daysLabel, rupees, shortDate, toPaise } from '@/lib/format';
 
@@ -27,10 +28,11 @@ function AmountSheet({ inst, onClose, onDone }) {
 }
 
 export default function Dashboard() {
-  const { t, family, user, members } = useAuth();
+  const { t, lang, family, user, members } = useAuth();
   const { data: d, error, loading, reload } = useData('/dashboard', { interval: 60000 });
   const [run] = useAction();
   const [amountFor, setAmountFor] = useState(null);
+  const [aiOpen, setAiOpen] = useState(false);
   if (loading && !d) return <Spinner />;
   if (error && !d) return <ErrorNote error={error} />;
   const hour = new Date().getHours();
@@ -43,7 +45,23 @@ export default function Dashboard() {
   return (
     <div className="row wrap" style={{ alignItems: 'flex-start', gap: 20 }}>
       <div className="grow col" style={{ minWidth: 300 }}>
-        <div><h1>{greet}, {user.name.split(' ')[0]}</h1><p className="muted small" style={{ margin: '4px 0 0' }}>{family.name} · {todo ? `${todo} thing${todo === 1 ? '' : 's'} need you` : 'You are all caught up'}</p></div>
+        <div>
+          <div className="row between" style={{ alignItems: 'flex-start' }}>
+            <div>
+              <h1>{greet}, {user.name.split(' ')[0]}</h1>
+              <p className="muted small" style={{ margin: '4px 0 0' }}>{family.name} · {todo ? `${todo} thing${todo === 1 ? '' : 's'} need you` : 'You are all caught up'}</p>
+            </div>
+            <button
+              type="button"
+              className="btn light sm"
+              onClick={() => setAiOpen(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 20, padding: '6px 12px', fontWeight: 600, color: 'var(--brand)' }}
+              title={lang === 'ml' ? 'എഐ വോയ്സ് അസിസ്റ്റന്റ്' : 'AI Voice Assistant'}
+            >
+              <span>✨</span> {lang === 'ml' ? 'എഐ വോയ്സ്' : 'AI Voice'}
+            </button>
+          </div>
+        </div>
 
         <section className="card hero" aria-label="Wallet">
           <div className="row between"><span className="small">{t('dash.wallet')} · {family.name}</span><Link className="btn light sm" href="/money">{t('dash.settle_up')}</Link></div>
@@ -112,6 +130,17 @@ export default function Dashboard() {
             <h2>{t('dash.quick_actions')}</h2>
           </div>
           <div className="quick-actions-grid">
+            <button
+              type="button"
+              className="quick-action-btn"
+              onClick={() => setAiOpen(true)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'center' }}
+            >
+              <span className="quick-action-icon" style={{ background: 'rgba(13, 71, 52, 0.15)', color: 'var(--brand)' }}>
+                <Icon name="mic" size={20} />
+              </span>
+              <span>{lang === 'ml' ? '✨ എഐ വോയ്സ്' : '✨ AI Voice'}</span>
+            </button>
             <Link href="/tasks" className="quick-action-btn">
               <span className="quick-action-icon" style={{ background: 'rgba(0, 113, 227, 0.12)', color: 'var(--info)' }}>
                 <Icon name="tasks" size={20} />
@@ -173,6 +202,15 @@ export default function Dashboard() {
       </div>
       <aside className="chat-aside card" style={{ width: 360, flex: 'none' }} aria-label="Family chat"><h2 style={{ marginBottom: 4 }}>{t('nav.chat')} {d.unreadChat ? <Badge tone="danger">{d.unreadChat} {t('notif.new')}</Badge> : null}</h2><ChatPanel compact /></aside>
       {amountFor ? <AmountSheet inst={amountFor} onClose={() => setAmountFor(null)} onDone={reload} /> : null}
+      {aiOpen ? (
+        <AiAssistantModal
+          onClose={() => setAiOpen(false)}
+          onDone={() => {
+            setAiOpen(false);
+            reload();
+          }}
+        />
+      ) : null}
     </div>
   );
 }
