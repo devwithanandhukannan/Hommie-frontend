@@ -3069,5 +3069,116 @@ html[data-theme='light'] .toast {
   border-color: rgba(52, 211, 153, 0.3);
 }
 
+/* ==========================================================================
+   Agentic AI Chat Panel Styles
+   ========================================================================== */
+
+.agentic-chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 480px;
+  background: var(--surface);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.agentic-header {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.agentic-messages-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.agentic-msg-row {
+  display: flex;
+  width: 100%;
+}
+.agentic-msg-row.user {
+  justify-content: flex-end;
+}
+.agentic-msg-row.assistant {
+  justify-content: flex-start;
+}
+
+.agentic-bubble {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  word-break: break-word;
+  position: relative;
+}
+.agentic-bubble.user {
+  background: var(--brand);
+  color: var(--on-brand, #FFFFFF);
+  border-bottom-right-radius: 4px;
+}
+.agentic-bubble.assistant {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-bottom-left-radius: 4px;
+}
+
+.agentic-action-card {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid rgba(13, 71, 52, 0.2);
+}
+[data-theme='dark'] .agentic-action-card {
+  border-color: rgba(52, 211, 153, 0.25);
+  background: #1C1C1E;
+}
+
+.agentic-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.agentic-chip-btn {
+  padding: 5px 10px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface);
+  color: var(--brand);
+  border: 1px solid rgba(13, 71, 52, 0.2);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.agentic-chip-btn:hover {
+  background: rgba(13, 71, 52, 0.1);
+  transform: translateY(-1px);
+}
+[data-theme='dark'] .agentic-chip-btn {
+  color: #34D399;
+  border-color: rgba(52, 211, 153, 0.3);
+  background: #242426;
+}
+[data-theme='dark'] .agentic-chip-btn:hover {
+  background: rgba(52, 211, 153, 0.15);
+}
+
+.agentic-msg-time {
+  font-size: 10px;
+  opacity: 0.7;
+  text-align: right;
+  margin-top: 4px;
+}
+
+
 
 

@@ -36,11 +36,19 @@ export default function QuickActionFab() {
 
   const saveGrocery = async (e) => {
     e.preventDefault();
-    const name = gName.trim();
-    if (!name) return;
-    const body = { name, status: 'needed' };
-    if (gQty.trim()) body.qty = gQty.trim();
-    if (await run(() => post('/grocery', body), `${name} added to grocery`)) {
+    const items = gName.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean);
+    if (items.length === 0) return;
+    if (await run(async () => {
+      if (items.length === 1) {
+        const body = { name: items[0], status: 'needed' };
+        if (gQty.trim()) body.qty = gQty.trim();
+        await post('/grocery', body);
+      } else {
+        for (const item of items) {
+          await post('/grocery', { name: item, status: 'needed' });
+        }
+      }
+    }, `${items.length} item${items.length === 1 ? '' : 's'} added to grocery`)) {
       setGName('');
       setGQty('');
       setSheet(null);
@@ -49,11 +57,15 @@ export default function QuickActionFab() {
 
   const saveTask = async (e) => {
     e.preventDefault();
-    const title = tTitle.trim();
-    if (!title) return;
-    const body = { title, kind: 'custom', assigneeId: tAssignee || null };
-    if (tDueDate) body.dueDate = tDueDate;
-    if (await run(() => post('/tasks', body), 'Task created')) {
+    const tasks = tTitle.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean);
+    if (tasks.length === 0) return;
+    if (await run(async () => {
+      for (const title of tasks) {
+        const body = { title, kind: 'custom', assigneeId: tAssignee || null };
+        if (tDueDate) body.dueDate = tDueDate;
+        await post('/tasks', body);
+      }
+    }, `${tasks.length} task${tasks.length === 1 ? '' : 's'} created`)) {
       setTTitle('');
       setTAssignee(null);
       setTDueDate('');
@@ -156,15 +168,19 @@ export default function QuickActionFab() {
           onClose={() => setSheet(null)}
         >
           <form className="col" onSubmit={saveGrocery}>
-            <Field label={lang === 'ml' ? 'സാധനത്തിന്റെ പേര്' : 'Item name'}>
+            <Field
+              label={lang === 'ml' ? 'സാധനങ്ങളുടെ പേര് (ഒന്നിലധികം ഉണ്ടെങ്കിൽ കോമ നൽകാം)' : 'Items (separate multiple with commas)'}
+              hint={lang === 'ml' ? 'ഉദാ: പാൽ, മുട്ട, സവാള, തക്കാളി' : 'e.g. Milk, Eggs, Onions, Tomato'}
+            >
               {(id) => (
-                <Input
+                <textarea
                   id={id}
+                  className="textarea"
                   required
-                  maxLength={120}
+                  rows={2}
                   value={gName}
                   onChange={(e) => setGName(e.target.value)}
-                  placeholder={lang === 'ml' ? 'ഉദാ: പാൽ, മുട്ട, സവാള' : 'e.g. Milk, Eggs, Onions'}
+                  placeholder={lang === 'ml' ? 'പാൽ, മുട്ട, സവാള...' : 'Milk, Eggs, Onions...'}
                   autoFocus
                 />
               )}
@@ -193,15 +209,19 @@ export default function QuickActionFab() {
           onClose={() => setSheet(null)}
         >
           <form className="col" onSubmit={saveTask}>
-            <Field label={lang === 'ml' ? 'എന്ത് ജോലിയാണ്?' : 'What needs to be done?'}>
+            <Field
+              label={lang === 'ml' ? 'ജോലികൾ (ഒന്നിലധികം ഉണ്ടെങ്കിൽ കോമ നൽകാം)' : 'Tasks (separate multiple with commas)'}
+              hint={lang === 'ml' ? 'ഉദാ: ബാത്ത്റൂം വൃത്തിയാക്കൽ, വസ്ത്രങ്ങൾ അലക്കുക' : 'e.g. Clean kitchen, Wash clothes'}
+            >
               {(id) => (
-                <Input
+                <textarea
                   id={id}
+                  className="textarea"
                   required
-                  maxLength={140}
+                  rows={2}
                   value={tTitle}
                   onChange={(e) => setTTitle(e.target.value)}
-                  placeholder={lang === 'ml' ? 'ഉദാ: ബാത്ത്റൂം വൃത്തിയാക്കൽ' : 'e.g. Clean the kitchen'}
+                  placeholder={lang === 'ml' ? 'ബാത്ത്റൂം വൃത്തിയാക്കൽ, വസ്ത്രങ്ങൾ അലക്കുക...' : 'Clean kitchen, Wash clothes...'}
                   autoFocus
                 />
               )}
