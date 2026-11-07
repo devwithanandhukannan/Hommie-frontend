@@ -36,7 +36,11 @@ export function ServerStatusProvider({ children }) {
         >
           {justConnected ? (
             <div className="row center" style={{ gap: 10 }}>
-              <span className="server-wake-check">✓</span>
+              <span className="server-wake-check" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+              </span>
               <div>
                 <div className="bold small">Cloud Server Connected</div>
                 <div className="tiny muted">Hommie is live and synced.</div>
@@ -54,7 +58,7 @@ export function ServerStatusProvider({ children }) {
                   Waking up cloud server...
                 </div>
                 <div className="tiny muted">
-                  Render free-tier server is spinning up (~30s). Please hold on.
+                  Please hold on.
                 </div>
               </div>
             </div>

@@ -33,7 +33,7 @@ export default function SettingsPage() {
 
   const toggleMicrophone = async () => {
     if (perms.microphone === 'granted') {
-      toast('To revoke permission, reset it in your browser address bar settings (🔒 icon).');
+      toast('To revoke permission, reset it in your browser address bar settings (lock icon).');
       return;
     }
     try {
@@ -48,7 +48,7 @@ export default function SettingsPage() {
 
   const toggleCamera = async () => {
     if (perms.camera === 'granted') {
-      toast('To revoke permission, reset it in your browser address bar settings (🔒 icon).');
+      toast('To revoke permission, reset it in your browser address bar settings (lock icon).');
       return;
     }
     try {
@@ -63,7 +63,7 @@ export default function SettingsPage() {
 
   const toggleNotifications = async () => {
     if (perms.notifications === 'granted') {
-      toast('To revoke notifications, reset it in your browser address bar settings (🔒 icon).');
+      toast('To revoke notifications, reset it in your browser address bar settings (lock icon).');
       return;
     }
     try {

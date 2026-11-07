@@ -191,15 +191,13 @@ function AiActionCard({ attachmentId, text, lang, t, onApplied }) {
     }
   };
 
-  const getActionIcon = (type) => {
-    switch (type) {
-      case 'grocery': return '🛒';
-      case 'bill': return '⚡';
-      case 'expense': return '💸';
-      case 'meal': return '🍲';
-      case 'medicine': return '💊';
-      default: return '📝';
-    }
+  const renderActionIcon = (type) => {
+    if (type?.includes('grocery')) return <Icon name="cart" size={16} />;
+    if (type?.includes('bill')) return <Icon name="bills" size={16} />;
+    if (type?.includes('expense')) return <Icon name="money" size={16} />;
+    if (type?.includes('meal')) return <Icon name="meals" size={16} />;
+    if (type?.includes('medicine')) return <Icon name="med" size={16} />;
+    return <Icon name="tasks" size={16} />;
   };
 
   if (state === 'idle') {
@@ -210,7 +208,7 @@ function AiActionCard({ attachmentId, text, lang, t, onApplied }) {
         onClick={scan}
         title={t('chat.ai_scan')}
       >
-        <span>✨</span>
+        <Icon name="sparkles" size={14} />
         <span>{t('chat.ai_scan')}</span>
       </button>
     );
@@ -228,7 +226,7 @@ function AiActionCard({ attachmentId, text, lang, t, onApplied }) {
   if (state === 'applied') {
     return (
       <div className="ai-applied-badge">
-        <span>✓</span>
+        <Icon name="check" size={14} />
         <span>{t('chat.ai_added_badge')}</span>
       </div>
     );
@@ -247,7 +245,7 @@ function AiActionCard({ attachmentId, text, lang, t, onApplied }) {
       <div className="ai-action-card">
         <div className="ai-card-header">
           <span className="ai-card-badge">
-            <span>✨</span>
+            <Icon name="sparkles" size={14} />
             <span>{t('chat.ai_assistant')}</span>
           </span>
           <button
@@ -256,7 +254,7 @@ function AiActionCard({ attachmentId, text, lang, t, onApplied }) {
             onClick={() => setState('idle')}
             title="Close"
           >
-            ✕
+            <Icon name="close" size={14} />
           </button>
         </div>
 
@@ -284,7 +282,7 @@ function AiActionCard({ attachmentId, text, lang, t, onApplied }) {
                       onChange={() => {}}
                       aria-label={`Select ${act.title}`}
                     />
-                    <span className="ai-chip-icon">{getActionIcon(act.type)}</span>
+                    <span className="ai-chip-icon">{renderActionIcon(act.type)}</span>
                     <span className="ai-chip-title">
                       {act.title}
                       {act.quantity ? ` (${act.quantity})` : ''}
@@ -922,8 +920,10 @@ export default function ChatPanel({ compact = false }) {
                           className="meta-action-btn"
                           onClick={() => setAiTextTargetId(aiTextTargetId === m.id ? null : m.id)}
                           title={t('chat.ai_scan')}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
                         >
-                          ✨ AI
+                          <Icon name="sparkles" size={11} />
+                          <span>AI</span>
                         </button>
                       ) : null}
                       <button
@@ -933,7 +933,7 @@ export default function ChatPanel({ compact = false }) {
                           setReplyingTo({
                             id: m.id,
                             senderName: m.sender?.displayName || 'Family',
-                            text: m.text || (m.type === 'audio' ? '🎤 Voice message' : '📷 Photo'),
+                            text: m.text || (m.type === 'audio' ? 'Voice message' : 'Photo'),
                           })
                         }
                         title="Reply to message"
@@ -964,11 +964,12 @@ export default function ChatPanel({ compact = false }) {
         <button
           type="button"
           className="chat-chip-pill"
-          style={{ background: 'rgba(13, 71, 52, 0.08)', color: 'var(--brand)', borderColor: 'rgba(13, 71, 52, 0.2)' }}
+          style={{ background: 'rgba(13, 71, 52, 0.08)', color: 'var(--brand)', borderColor: 'rgba(13, 71, 52, 0.2)', display: 'inline-flex', alignItems: 'center', gap: 6 }}
           onClick={() => setAiModalOpen(true)}
           title={t('chat.ai_voice_assistant')}
         >
-          <span>✨</span> {lang === 'ml' ? 'എഐ വോയ്സ്' : 'AI Voice'}
+          <Icon name="sparkles" size={14} />
+          <span>{lang === 'ml' ? 'എഐ വോയ്സ്' : 'AI Voice'}</span>
         </button>
         <button
           type="button"
@@ -1043,7 +1044,7 @@ export default function ChatPanel({ compact = false }) {
               className="pill-menu-item"
               onClick={() => { setMoreMenuOpen(false); setAiModalOpen(true); }}
             >
-              <span style={{ fontSize: 16 }}>✨</span> {t('chat.ai_voice_assistant')}
+              <Icon name="sparkles" size={16} /> {t('chat.ai_voice_assistant')}
             </button>
             <button
               type="button"

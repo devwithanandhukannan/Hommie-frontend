@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 import { post, upload } from '@/lib/api';
-import { Icon, Spinner, Btn } from '@/components/ui';
+import { Icon, Spinner } from '@/components/ui';
 import { hhmm } from '@/lib/format';
 
 export default function AgenticChatPanel() {
@@ -14,13 +14,13 @@ export default function AgenticChatPanel() {
       text:
         lang === 'ml'
           ? 'നമസ്കാരം! ഞാൻ നിങ്ങളുടെ Hommi AI സഹായിയാണ്. അടുക്കളയിലെ സാധനങ്ങൾ അറിയാനും, ബിരിയാണി പോലുള്ള വിഭവങ്ങൾക്കുള്ള ലിസ്റ്റ് തയ്യാറാക്കാനും, ജോലികൾ നൽകാനും, ഈ മാസത്തെ ചിലവ് കണക്കാക്കാനും എന്നോട് ചോദിക്കാം.'
-          : 'Hello! I am your Hommi AI assistant. Ask me what groceries to buy, what ingredients you need to cook biriyani, your tasks today, or this month’s family expenses.',
+          : 'Hello! I am your Hommi AI assistant. Ask me what groceries to buy, ingredients needed for biriyani, pending chores, or this month’s family expenses.',
       actions: [],
       timestamp: new Date().toISOString(),
       suggestedChips:
         lang === 'ml'
-          ? ['🛒 എന്തൊക്കെ വാങ്ങാനുണ്ട്?', '🍲 ബിരിയാണി ഉണ്ടാക്കാൻ എന്ത് വേണം?', '💸 ഈ മാസത്തെ ചിലവ് എത്ര?', '💊 ഇന്നത്തെ മരുന്നുകൾ']
-          : ['🛒 What to buy?', '🍲 Make Biriyani (check kitchen)', '💸 Monthly expenses', '💊 Today’s medicines'],
+          ? ['എന്തൊക്കെ വാങ്ങാനുണ്ട്?', 'ബിരിയാണി ഉണ്ടാക്കാൻ എന്ത് വേണം?', 'ഈ മാസത്തെ ചിലവ് എത്ര?', 'ഇന്നത്തെ മരുന്നുകൾ']
+          : ['What to buy?', 'Make Biriyani (check kitchen)', 'Monthly expenses', 'Today’s medicines'],
     },
   ]);
   const [input, setInput] = useState('');
@@ -58,7 +58,7 @@ export default function AgenticChatPanel() {
     const userMsg = {
       id: userMsgId,
       role: 'user',
-      text: textToSend || (lang === 'ml' ? '🎤 വോയ്സ് നോട്ട് അയച്ചു...' : '🎤 Spoke voice message...'),
+      text: textToSend || (lang === 'ml' ? 'വോയ്സ് നോട്ട് അയച്ചു...' : 'Spoke voice message...'),
       timestamp: new Date().toISOString(),
     };
 
@@ -98,7 +98,7 @@ export default function AgenticChatPanel() {
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
-    } catch (err) {
+    } catch {
       setMessages((prev) => [
         ...prev,
         {
@@ -209,7 +209,24 @@ export default function AgenticChatPanel() {
     if (!actionsToApply || actionsToApply.length === 0) return;
     setApplyingId(msgId);
     try {
-      await post('/ai/apply', { actions: actionsToApply, notifyInChat: true });
+      const sanitized = actionsToApply.map((a) => ({
+        type: a.type || 'grocery',
+        title: String(a.title || '').trim().slice(0, 140),
+        quantity: a.quantity ? String(a.quantity).slice(0, 60) : null,
+        category: a.category ? String(a.category).slice(0, 50) : null,
+        shop: a.shop ? String(a.shop).slice(0, 60) : null,
+        amount: typeof a.amount === 'number' && !isNaN(a.amount) ? a.amount : null,
+        dueDate: a.dueDate || undefined,
+        slot: a.slot || undefined,
+        date: a.date || undefined,
+        cookName: a.cookName || undefined,
+        assigneeName: a.assigneeName || undefined,
+        targetId: a.targetId || undefined,
+        ingredients: Array.isArray(a.ingredients) ? a.ingredients : undefined,
+        steps: Array.isArray(a.steps) ? a.steps : undefined,
+      }));
+
+      await post('/ai/apply', { actions: sanitized, notifyInChat: true });
       setMessages((prev) =>
         prev.map((m) => (m.id === msgId ? { ...m, applied: true } : m))
       );
@@ -220,13 +237,16 @@ export default function AgenticChatPanel() {
     }
   };
 
-  const getActionIcon = (type) => {
-    if (type?.includes('grocery')) return '🛒';
-    if (type?.includes('task')) return '📝';
-    if (type?.includes('delete')) return '🗑️';
-    if (type?.includes('expense')) return '💸';
-    if (type?.includes('medicine')) return '💊';
-    return '⚡';
+  const renderActionIcon = (type) => {
+    if (type?.includes('grocery')) return <Icon name="cart" size={16} />;
+    if (type?.includes('recipe')) return <Icon name="recipes" size={16} />;
+    if (type?.includes('meal')) return <Icon name="meals" size={16} />;
+    if (type?.includes('calendar')) return <Icon name="calendar" size={16} />;
+    if (type?.includes('task')) return <Icon name="tasks" size={16} />;
+    if (type?.includes('delete')) return <Icon name="trash" size={16} />;
+    if (type?.includes('expense')) return <Icon name="money" size={16} />;
+    if (type?.includes('medicine')) return <Icon name="med" size={16} />;
+    return <Icon name="tasks" size={16} />;
   };
 
   return (
@@ -234,7 +254,7 @@ export default function AgenticChatPanel() {
       {/* Top Banner */}
       <div className="agentic-header">
         <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-          <span style={{ fontSize: 20 }}>✨</span>
+          <Icon name="sparkles" size={20} />
           <div>
             <div className="bold" style={{ fontSize: 14 }}>Hommi AI Agent</div>
             <div className="tiny muted">{lang === 'ml' ? 'വീട്ടുസഹായി · ചോദിക്കാം' : 'Household Assistant · Ask anything'}</div>
@@ -246,6 +266,22 @@ export default function AgenticChatPanel() {
       <div className="agentic-messages-list">
         {messages.map((m) => {
           const isUser = m.role === 'user';
+          const recipeActions = (m.actions || []).filter((a) => a.type?.includes('recipe'));
+          const mealActions = (m.actions || []).filter((a) => a.type?.includes('meal'));
+          const calendarActions = (m.actions || []).filter((a) => a.type?.includes('calendar'));
+          const groceryActions = (m.actions || []).filter((a) => a.type?.includes('grocery'));
+          const otherActions = (m.actions || []).filter(
+            (a) => !a.type?.includes('recipe') && !a.type?.includes('meal') && !a.type?.includes('calendar') && !a.type?.includes('grocery')
+          );
+
+          // Group groceries by shop
+          const groceriesByShop = {};
+          for (const g of groceryActions) {
+            const shop = g.shop || (lang === 'ml' ? 'പലചരക്ക് കട' : 'Supermarket / Grocery');
+            if (!groceriesByShop[shop]) groceriesByShop[shop] = [];
+            groceriesByShop[shop].push(g);
+          }
+
           return (
             <div key={m.id} className={`agentic-msg-row ${isUser ? 'user' : 'assistant'}`}>
               <div className={`agentic-bubble ${isUser ? 'user' : 'assistant'}`}>
@@ -256,70 +292,205 @@ export default function AgenticChatPanel() {
                 {/* Proposed Action Card */}
                 {!isUser && m.actions && m.actions.length > 0 ? (
                   <div className="agentic-action-card">
-                    <div className="row between" style={{ marginBottom: 6 }}>
-                      <span className="small bold" style={{ color: 'var(--brand)' }}>
-                        {m.actions[0].type === 'delete_task'
-                          ? (lang === 'ml' ? 'ഒഴിവാക്കേണ്ട ജോലി' : 'Task to delete')
-                          : (lang === 'ml' ? '✨ നിർദ്ദേശിച്ച ഇനങ്ങൾ' : '✨ Suggested Actions')}
+                    <div className="row between" style={{ marginBottom: 8, alignItems: 'center' }}>
+                      <span className="small bold" style={{ color: 'var(--brand)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <Icon name="sparkles" size={15} />
+                        <span>
+                          {m.actions[0].type === 'delete_task'
+                            ? (lang === 'ml' ? 'ഒഴിവാക്കേണ്ട ജോലി' : 'Task to delete')
+                            : (lang === 'ml' ? 'നിർദ്ദേശിച്ച ഇനങ്ങൾ' : 'Suggested Actions')}
+                        </span>
                       </span>
                       {m.applied ? (
-                        <span className="small bold" style={{ color: '#059669' }}>
-                          {lang === 'ml' ? '✓ ചേർത്തു' : '✓ Applied'}
+                        <span className="small bold" style={{ color: '#059669', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <Icon name="check" size={14} />
+                          <span>{lang === 'ml' ? 'ചേർത്തു' : 'Applied'}</span>
                         </span>
                       ) : null}
                     </div>
 
                     {!m.applied ? (
-                      <div className="col" style={{ gap: 6 }}>
-                        {m.actions.map((act, idx) => {
-                          const isSelected = (m.selectedActions || []).includes(act);
-                          return (
-                            <div
-                              key={idx}
-                              className={`ai-chip-item ${!isSelected ? 'deselected' : ''}`}
-                              onClick={() => toggleActionItem(m.id, act)}
-                            >
-                              <input
-                                type="checkbox"
-                                className="ai-chip-checkbox"
-                                checked={isSelected}
-                                onChange={() => {}}
-                                aria-label={act.title}
-                              />
-                              <span className="ai-chip-icon">{getActionIcon(act.type)}</span>
-                              <span className="ai-chip-title">
-                                {act.title}
-                                {act.quantity ? ` (${act.quantity})` : ''}
-                                {act.amount ? ` (₹${act.amount})` : ''}
+                      <div className="col" style={{ gap: 10 }}>
+                        {/* Recipe, Meal, & Calendar Cards */}
+                        {(recipeActions.length > 0 || mealActions.length > 0 || calendarActions.length > 0) && (
+                          <div className="col" style={{ gap: 6 }}>
+                            {recipeActions.map((act, idx) => {
+                              const isSelected = (m.selectedActions || []).includes(act);
+                              return (
+                                <div
+                                  key={`rec-${idx}`}
+                                  className={`ai-chip-item ${!isSelected ? 'deselected' : ''}`}
+                                  onClick={() => toggleActionItem(m.id, act)}
+                                  style={{ background: 'var(--bg-subtle, rgba(11, 107, 93, 0.08))', borderColor: 'var(--brand)' }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="ai-chip-checkbox"
+                                    checked={isSelected}
+                                    onChange={() => {}}
+                                    aria-label={act.title}
+                                  />
+                                  <span className="ai-chip-icon">{renderActionIcon('recipe')}</span>
+                                  <span className="ai-chip-title" style={{ fontWeight: 600 }}>
+                                    {act.title}
+                                  </span>
+                                  <span className="ai-chip-tag" style={{ background: 'var(--brand)', color: '#fff' }}>
+                                    {lang === 'ml' ? 'പാചകക്കുറിപ്പ്' : 'Recipe'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+
+                            {mealActions.map((act, idx) => {
+                              const isSelected = (m.selectedActions || []).includes(act);
+                              return (
+                                <div
+                                  key={`meal-${idx}`}
+                                  className={`ai-chip-item ${!isSelected ? 'deselected' : ''}`}
+                                  onClick={() => toggleActionItem(m.id, act)}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="ai-chip-checkbox"
+                                    checked={isSelected}
+                                    onChange={() => {}}
+                                    aria-label={act.title}
+                                  />
+                                  <span className="ai-chip-icon">{renderActionIcon('meal')}</span>
+                                  <span className="ai-chip-title">
+                                    {act.title} {act.date ? `· ${act.date}` : ''} {act.slot ? `(${act.slot})` : ''}
+                                    {act.cookName ? ` · Cook: ${act.cookName}` : ''}
+                                  </span>
+                                  <span className="ai-chip-tag">
+                                    {lang === 'ml' ? 'ഭക്ഷണ പ്ലാൻ' : 'Meal'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+
+                            {calendarActions.map((act, idx) => {
+                              const isSelected = (m.selectedActions || []).includes(act);
+                              return (
+                                <div
+                                  key={`cal-${idx}`}
+                                  className={`ai-chip-item ${!isSelected ? 'deselected' : ''}`}
+                                  onClick={() => toggleActionItem(m.id, act)}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="ai-chip-checkbox"
+                                    checked={isSelected}
+                                    onChange={() => {}}
+                                    aria-label={act.title}
+                                  />
+                                  <span className="ai-chip-icon">{renderActionIcon('calendar')}</span>
+                                  <span className="ai-chip-title">
+                                    {act.title} {act.dueDate ? `· ${act.dueDate}` : ''}
+                                    {act.assigneeName ? ` · ${act.assigneeName}` : ''}
+                                  </span>
+                                  <span className="ai-chip-tag">
+                                    {lang === 'ml' ? 'കലണ്ടർ' : 'Calendar'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Groceries Grouped by Shop */}
+                        {Object.entries(groceriesByShop).map(([shopName, items]) => (
+                          <div key={shopName} className="col" style={{ gap: 6 }}>
+                            <div className="row" style={{ gap: 6, alignItems: 'center', marginTop: 2 }}>
+                              <Icon name="store" size={14} />
+                              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)' }}>
+                                {shopName}
                               </span>
-                              {act.category ? (
-                                <span className="ai-chip-tag">{act.category}</span>
-                              ) : null}
                             </div>
-                          );
-                        })}
+                            <div className="col" style={{ gap: 6 }}>
+                              {items.map((act, idx) => {
+                                const isSelected = (m.selectedActions || []).includes(act);
+                                return (
+                                  <div
+                                    key={idx}
+                                    className={`ai-chip-item ${!isSelected ? 'deselected' : ''}`}
+                                    onClick={() => toggleActionItem(m.id, act)}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="ai-chip-checkbox"
+                                      checked={isSelected}
+                                      onChange={() => {}}
+                                      aria-label={act.title}
+                                    />
+                                    <span className="ai-chip-icon">{renderActionIcon('grocery')}</span>
+                                    <span className="ai-chip-title">
+                                      {act.title}
+                                      {act.quantity ? ` (${act.quantity})` : ''}
+                                    </span>
+                                    {act.category ? (
+                                      <span className="ai-chip-tag">{act.category}</span>
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Other Actions (Tasks, Expenses, Delete) */}
+                        {otherActions.length > 0 && (
+                          <div className="col" style={{ gap: 6, marginTop: 2 }}>
+                            {otherActions.map((act, idx) => {
+                              const isSelected = (m.selectedActions || []).includes(act);
+                              return (
+                                <div
+                                  key={idx}
+                                  className={`ai-chip-item ${!isSelected ? 'deselected' : ''}`}
+                                  onClick={() => toggleActionItem(m.id, act)}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="ai-chip-checkbox"
+                                    checked={isSelected}
+                                    onChange={() => {}}
+                                    aria-label={act.title}
+                                  />
+                                  <span className="ai-chip-icon">{renderActionIcon(act.type)}</span>
+                                  <span className="ai-chip-title">
+                                    {act.title}
+                                    {act.amount ? ` (₹${act.amount})` : ''}
+                                  </span>
+                                  <span className="ai-chip-tag">{act.type}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
 
                         <button
                           type="button"
                           className="ai-apply-btn"
                           disabled={applyingId === m.id || (m.selectedActions || []).length === 0}
                           onClick={() => executeActions(m.id, m.selectedActions)}
-                          style={{ marginTop: 4 }}
+                          style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                         >
                           {applyingId === m.id ? (
                             <Spinner size={13} />
                           ) : m.actions[0].type === 'delete_task' ? (
                             <span>{lang === 'ml' ? 'ജോലി ഒഴിവാക്കുക' : 'Delete Task'}</span>
                           ) : (
-                            <span>
-                              + {lang === 'ml' ? 'Hommi-ലേക്ക് ചേർക്കുക' : 'Add to Hommi'} ({(m.selectedActions || []).length})
-                            </span>
+                            <>
+                              <Icon name="check" size={15} />
+                              <span>
+                                {lang === 'ml' ? 'Hommi-ലേക്ക് ചേർക്കുക' : 'Add to Hommi'} ({(m.selectedActions || []).length})
+                              </span>
+                            </>
                           )}
                         </button>
                       </div>
                     ) : (
-                      <div className="ai-applied-badge">
-                        <span>✓</span>
+                      <div className="ai-applied-badge" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Icon name="check" size={16} />
                         <span>{lang === 'ml' ? 'വിവരങ്ങൾ Hommi-ലേക്ക് ചേർത്തു!' : 'Items updated in family lists!'}</span>
                       </div>
                     )}
@@ -432,4 +603,3 @@ export default function AgenticChatPanel() {
     </div>
   );
 }
-

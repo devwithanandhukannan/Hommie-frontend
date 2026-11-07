@@ -50,10 +50,10 @@ export default function Dashboard() {
           <div className="row between" style={{ alignItems: 'flex-start' }}>
             <div>
               <h1 style={{ margin: 0, fontSize: 26, letterSpacing: '-0.02em' }}>
-                {greet}, {user.name.split(' ')[0]} 👋
+                {greet}, {user.name.split(' ')[0]}
               </h1>
               <p className="muted small" style={{ margin: '4px 0 0' }}>
-                {family.name} · {todo ? (lang === 'ml' ? `ഇന്ന് ${todo} കാര്യങ്ങൾ ചെയ്യാനുണ്ട്` : `${todo} thing${todo === 1 ? '' : 's'} need you today`) : (lang === 'ml' ? 'ഇന്നത്തെ കാര്യങ്ങളെല്ലാം പൂർത്തിയായി ✨' : 'You are all caught up ✨')}
+                {family.name} · {todo ? (lang === 'ml' ? `ഇന്ന് ${todo} കാര്യങ്ങൾ ചെയ്യാനുണ്ട്` : `${todo} thing${todo === 1 ? '' : 's'} need you today`) : (lang === 'ml' ? 'ഇന്നത്തെ കാര്യങ്ങളെല്ലാം പൂർത്തിയായി' : 'You are all caught up')}
               </p>
             </div>
             <button
@@ -63,7 +63,8 @@ export default function Dashboard() {
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 20, padding: '7px 14px', fontWeight: 600, color: 'var(--brand)', background: 'rgba(13, 71, 52, 0.08)', border: '1px solid rgba(13, 71, 52, 0.2)' }}
               title={lang === 'ml' ? 'എഐ വോയ്സ് അസിസ്റ്റന്റ്' : 'AI Voice Assistant'}
             >
-              <span>🎙️ ✨</span> {lang === 'ml' ? 'എഐ വോയ്സ്' : 'AI Voice'}
+              <Icon name="sparkles" size={15} />
+              <span>{lang === 'ml' ? 'എഐ വോയ്സ്' : 'AI Voice'}</span>
             </button>
           </div>
         </div>
@@ -72,8 +73,8 @@ export default function Dashboard() {
         {d.medicinesDueToday.length ? (
           <section className="card" aria-label="Medicine" style={{ borderLeft: '4px solid #10B981' }}>
             <div className="row between" style={{ marginBottom: 8 }}>
-              <div className="row" style={{ gap: 8 }}>
-                <span style={{ fontSize: 18 }}>💊</span>
+              <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+                <Icon name="med" size={18} />
                 <h2 style={{ margin: 0, fontSize: 16 }}>{lang === 'ml' ? 'കഴിക്കേണ്ട മരുന്നുകൾ' : t('dash.medicine')}</h2>
               </div>
               <Link href="/medicine" className="small bold">{t('dash.see_all')}</Link>
@@ -87,7 +88,7 @@ export default function Dashboard() {
                   </div>
                   {m.status === 'missed' ? <Badge tone="danger">{lang === 'ml' ? 'വിട്ടുപോയി' : 'Missed'}</Badge> : null}
                   <Btn size="sm" onClick={() => give(m)}>
-                    {lang === 'ml' ? 'നൽകി ✓' : t('med.given')}
+                    {lang === 'ml' ? 'നൽകി' : t('med.given')}
                   </Btn>
                 </div>
               ))}
@@ -98,8 +99,8 @@ export default function Dashboard() {
         {/* 2. TODAY'S MEALS: What's cooking today */}
         <section className="card" aria-label="Meals">
           <div className="row between" style={{ marginBottom: 10 }}>
-            <div className="row" style={{ gap: 8 }}>
-              <span style={{ fontSize: 18 }}>🍲</span>
+            <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+              <Icon name="meals" size={18} />
               <h2 style={{ margin: 0, fontSize: 16 }}>{lang === 'ml' ? 'ഇന്നത്തെ ഭക്ഷണം' : t('dash.meals')}</h2>
             </div>
             <Link href="/planner?tab=meals" className="small bold">{lang === 'ml' ? 'പ്ലാൻ ചെയ്യുക ›' : t('dash.plan')}</Link>
@@ -141,14 +142,14 @@ export default function Dashboard() {
         {/* 3. TODAY'S TASKS: Chores & To-Dos */}
         <section className="card" aria-label="To do">
           <div className="row between" style={{ marginBottom: 10 }}>
-            <div className="row" style={{ gap: 8 }}>
-              <span style={{ fontSize: 18 }}>🧹</span>
+            <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+              <Icon name="tasks" size={18} />
               <h2 style={{ margin: 0, fontSize: 16 }}>{lang === 'ml' ? 'ഇന്നത്തെ ജോലികൾ' : t('dash.todo')}</h2>
             </div>
             <Link href="/planner?tab=tasks" className="small bold">{t('dash.see_all')}</Link>
           </div>
           {d.billsNeedingAmount.length + d.myTasks.length === 0 ? (
-            <Empty>{lang === 'ml' ? 'ഇന്ന് ചെയ്യേണ്ട ജോലികൾ ഒന്നുമില്ല ✨' : t('dash.no_tasks')}</Empty>
+            <Empty>{lang === 'ml' ? 'ഇന്ന് ചെയ്യേണ്ട ജോലികൾ ഒന്നുമില്ല' : t('dash.no_tasks')}</Empty>
           ) : (
             <div className="list">
               {d.billsNeedingAmount.map((b) => (
@@ -185,8 +186,8 @@ export default function Dashboard() {
         {/* 4. GROCERY PREVIEW: Items to buy */}
         <section className="card" aria-label="Grocery">
           <div className="row between" style={{ marginBottom: 10 }}>
-            <div className="row" style={{ gap: 8 }}>
-              <span style={{ fontSize: 18 }}>🛒</span>
+            <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+              <Icon name="cart" size={18} />
               <h2 style={{ margin: 0, fontSize: 16 }}>{lang === 'ml' ? 'വാങ്ങേണ്ട പലചരക്കുകൾ' : t('dash.grocery')}</h2>
             </div>
             <Link href="/planner?tab=grocery" className="small bold">{lang === 'ml' ? 'ലിസ്റ്റ് തുറക്കുക ›' : t('dash.open')}</Link>
@@ -214,8 +215,8 @@ export default function Dashboard() {
         {/* 5. COMPACT FINANCES: Friendly Family Wallet & Upcoming Bills */}
         <section className="card" aria-label="Finances" style={{ background: 'var(--surface-2)', border: '1px solid var(--line)' }}>
           <div className="row between" style={{ marginBottom: 8 }}>
-            <div className="row" style={{ gap: 8 }}>
-              <span style={{ fontSize: 18 }}>💳</span>
+            <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+              <Icon name="money" size={18} />
               <h2 style={{ margin: 0, fontSize: 16 }}>{lang === 'ml' ? 'കുടുംബ ചിലവുകൾ & ബില്ലുകൾ' : 'Family Finances'}</h2>
             </div>
             <Link href="/money" className="small bold">{lang === 'ml' ? 'വിശദാംശങ്ങൾ ›' : t('dash.settle_up')}</Link>
@@ -254,7 +255,7 @@ export default function Dashboard() {
               <span className="quick-action-icon" style={{ background: 'rgba(13, 71, 52, 0.15)', color: 'var(--brand)' }}>
                 <Icon name="mic" size={20} />
               </span>
-              <span>{lang === 'ml' ? '✨ എഐ വോയ്സ്' : '✨ AI Voice'}</span>
+              <span>{lang === 'ml' ? 'എഐ വോയ്സ്' : 'AI Voice'}</span>
             </button>
             <Link href="/planner?tab=tasks" className="quick-action-btn">
               <span className="quick-action-icon" style={{ background: 'rgba(0, 113, 227, 0.12)', color: 'var(--info)' }}>

@@ -4,7 +4,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import ChatPanel from '@/components/ChatPanel';
 import AgenticChatPanel from '@/components/AgenticChatPanel';
 import { useAuth } from '@/lib/auth';
-import { Spinner } from '@/components/ui';
+import { Spinner, Icon } from '@/components/ui';
 
 function ChatPageContent() {
   const { family, t, lang } = useAuth();
@@ -29,10 +29,15 @@ function ChatPageContent() {
     <div className="chat-container-page">
       <div className="chat-header-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
         <div>
-          <h1 className="bold" style={{ fontSize: 18, margin: 0 }}>
-            {mode === 'ai'
-              ? (lang === 'ml' ? '✨ Hommi AI ഏജന്റ്' : '✨ Hommi AI Agent')
-              : t('chat.title')}
+          <h1 className="bold" style={{ fontSize: 18, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+            {mode === 'ai' ? (
+              <>
+                <Icon name="sparkles" size={20} />
+                <span>{lang === 'ml' ? 'Hommi AI ഏജന്റ്' : 'Hommi AI Agent'}</span>
+              </>
+            ) : (
+              t('chat.title')
+            )}
           </h1>
           <div className="small muted" style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {mode === 'ai'
@@ -47,7 +52,10 @@ function ChatPageContent() {
             type="button"
             onClick={() => switchMode('family')}
             style={{
-              padding: '5px 12px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '6px 14px',
               borderRadius: 16,
               fontSize: 12,
               fontWeight: 600,
@@ -59,13 +67,17 @@ function ChatPageContent() {
               transition: 'all 0.15s ease',
             }}
           >
-            👨‍👩‍👧‍👦 {lang === 'ml' ? 'കുടുംബ ചാറ്റ്' : 'Family Chat'}
+            <Icon name="family" size={14} />
+            <span>{lang === 'ml' ? 'കുടുംബ ചാറ്റ്' : 'Family Chat'}</span>
           </button>
           <button
             type="button"
             onClick={() => switchMode('ai')}
             style={{
-              padding: '5px 12px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '6px 14px',
               borderRadius: 16,
               fontSize: 12,
               fontWeight: 600,
@@ -77,7 +89,8 @@ function ChatPageContent() {
               transition: 'all 0.15s ease',
             }}
           >
-            ✨ {lang === 'ml' ? 'Hommi AI' : 'Hommi AI'}
+            <Icon name="sparkles" size={14} />
+            <span>{lang === 'ml' ? 'Hommi AI' : 'Hommi AI'}</span>
           </button>
         </div>
       </div>

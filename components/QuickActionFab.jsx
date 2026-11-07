@@ -111,15 +111,19 @@ export default function QuickActionFab() {
               className="fab-item fab-item-ai"
               onClick={() => { setOpen(false); setSheet('ai'); }}
             >
-              <span className="fab-item-icon">🎙️</span>
-              <span className="fab-item-label">{lang === 'ml' ? '✨ എഐ വോയ്സ്' : '✨ AI Voice'}</span>
+              <span className="fab-item-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="sparkles" size={18} />
+              </span>
+              <span className="fab-item-label">{lang === 'ml' ? 'എഐ വോയ്സ്' : 'AI Voice'}</span>
             </button>
             <button
               type="button"
               className="fab-item"
               onClick={() => { setOpen(false); setSheet('grocery'); }}
             >
-              <span className="fab-item-icon">🛒</span>
+              <span className="fab-item-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="cart" size={18} />
+              </span>
               <span className="fab-item-label">{lang === 'ml' ? '+ പലചരക്ക്' : '+ Grocery'}</span>
             </button>
             <button
@@ -127,7 +131,9 @@ export default function QuickActionFab() {
               className="fab-item"
               onClick={() => { setOpen(false); setSheet('task'); }}
             >
-              <span className="fab-item-icon">📝</span>
+              <span className="fab-item-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="tasks" size={18} />
+              </span>
               <span className="fab-item-label">{lang === 'ml' ? '+ ജോലി' : '+ Task'}</span>
             </button>
             <button
@@ -135,7 +141,9 @@ export default function QuickActionFab() {
               className="fab-item"
               onClick={() => { setOpen(false); setSheet('expense'); }}
             >
-              <span className="fab-item-icon">💸</span>
+              <span className="fab-item-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="money" size={18} />
+              </span>
               <span className="fab-item-label">{lang === 'ml' ? '+ ചിലവ്' : '+ Expense'}</span>
             </button>
           </div>
@@ -148,7 +156,9 @@ export default function QuickActionFab() {
           aria-label={open ? 'Close actions menu' : 'Quick add'}
           title="Quick Add"
         >
-          <span className="fab-icon-plus">{open ? '✕' : '+'}</span>
+          <span className="fab-icon-plus" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            {open ? <Icon name="close" size={18} /> : <Icon name="plus" size={20} />}
+          </span>
         </button>
       </div>
 
@@ -157,14 +167,14 @@ export default function QuickActionFab() {
           onClose={() => setSheet(null)}
           onDone={() => {
             setSheet(null);
-            toast(lang === 'ml' ? 'ലിസ്റ്റിലേക്ക് ചേർത്തു ✓' : 'Added to Hommi ✓');
+            toast(lang === 'ml' ? 'ലിസ്റ്റിലേക്ക് ചേർത്തു' : 'Added to Hommi');
           }}
         />
       ) : null}
 
       {sheet === 'grocery' ? (
         <Sheet
-          title={lang === 'ml' ? '🛒 പലചരക്ക് സാധനം ചേർക്കുക' : '🛒 Add Grocery Item'}
+          title={lang === 'ml' ? 'പലചരക്ക് സാധനം ചേർക്കുക' : 'Add Grocery Item'}
           onClose={() => setSheet(null)}
         >
           <form className="col" onSubmit={saveGrocery}>
@@ -205,7 +215,7 @@ export default function QuickActionFab() {
 
       {sheet === 'task' ? (
         <Sheet
-          title={lang === 'ml' ? '📝 പുതിയ ജോലി നൽകുക' : '📝 Add New Task'}
+          title={lang === 'ml' ? 'പുതിയ ജോലി നൽകുക' : 'Add New Task'}
           onClose={() => setSheet(null)}
         >
           <form className="col" onSubmit={saveTask}>
@@ -259,7 +269,7 @@ export default function QuickActionFab() {
 
       {sheet === 'expense' ? (
         <Sheet
-          title={lang === 'ml' ? '💸 ചിലവ് രേഖപ്പെടുത്തുക' : '💸 Record Expense'}
+          title={lang === 'ml' ? 'ചിലവ് രേഖപ്പെടുത്തുക' : 'Record Expense'}
           onClose={() => setSheet(null)}
         >
           <form className="col" onSubmit={saveExpense}>
