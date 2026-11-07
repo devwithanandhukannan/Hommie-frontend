@@ -1,17 +1,20 @@
 'use client';
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import ChatPanel from '@/components/ChatPanel';
 import AgenticChatPanel from '@/components/AgenticChatPanel';
-import { useAuth } from '@/lib/auth';
+import AiAssistantModal from '@/components/AiAssistantModal';
+import { useAuth, useData } from '@/lib/auth';
 import { Spinner, Icon } from '@/components/ui';
 
 function ChatPageContent() {
-  const { family, t, lang } = useAuth();
+  const { family, t, lang, user } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const initialMode = searchParams.get('mode') === 'ai' ? 'ai' : 'family';
+  const initialMode = searchParams.get('mode') === 'family' ? 'family' : 'ai';
   const [mode, setMode] = useState(initialMode);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const auditData = useData('/families/current/audit', { interval: 60000 });
 
   useEffect(() => {
     const qMode = searchParams.get('mode');
@@ -25,79 +28,158 @@ function ChatPageContent() {
     router.replace(`/chat?mode=${m}`, { scroll: false });
   };
 
+  const firstName = user?.name ? user.name.split(' ')[0] : 'Anandhu';
+
+  // Activities list
+  const recentActivities = useMemo(() => {
+    if (auditData.data?.length) {
+      return auditData.data.slice(0, 4).map((a) => {
+        const timeStr = new Date(a.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: false });
+        let text = `${a.actor?.displayName || 'Someone'} ${a.action}`;
+        if (a.entity) text += ` ${a.entity}`;
+        return { id: a.id, text, time: timeStr };
+      });
+    }
+    return [
+      { id: '1', text: `${firstName} bought Basmati Rice`, time: '6:07 pm' },
+      { id: '2', text: 'Bathroom cleaning added', time: '5:17 pm' },
+    ];
+  }, [auditData.data, firstName]);
+
   return (
-    <div className="chat-container-page">
-      <div className="chat-header-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-        <div>
-          <h1 className="bold" style={{ fontSize: 18, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-            {mode === 'ai' ? (
-              <>
-                <Icon name="sparkles" size={20} />
-                <span>{lang === 'ml' ? 'Hommi AI ഏജന്റ്' : 'Hommi AI Agent'}</span>
-              </>
-            ) : (
-              t('chat.title')
-            )}
+    <div className="chat-editorial-page">
+      {/* Header and Mode Toggle */}
+      <div className="row between" style={{ marginBottom: 24, alignItems: 'center' }}>
+        <div className="section-label">
+          {mode === 'ai' ? 'ASK HOMMI' : 'FAMILY CHAT'}
+        </div>
+
+        {/* Minimalist Switch */}
+        <div className="row" style={{ gap: 8 }}>
+          <button
+            type="button"
+            className={`pill-btn ${mode === 'ai' ? 'active' : ''}`}
+            onClick={() => switchMode('ai')}
+          >
+            Ask Hommi
+          </button>
+          <button
+            type="button"
+            className={`pill-btn ${mode === 'family' ? 'active' : ''}`}
+            onClick={() => switchMode('family')}
+          >
+            Family Chat
+          </button>
+        </div>
+      </div>
+
+      {mode === 'ai' ? (
+        <div style={{ maxWidth: 540, margin: '0 auto', textAlign: 'center', paddingTop: 16 }}>
+          {/* Big Serif Heading: Just say it. */}
+          <h1 className="editorial-title" style={{ fontSize: 48, marginBottom: 10 }}>
+            Just say it.
           </h1>
-          <div className="small muted" style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {mode === 'ai'
-              ? (lang === 'ml' ? 'വീട്ടുസഹായി · ഓർമ്മപ്പെടുത്തലുകൾ, പാചകം, ചിലവുകൾ' : 'Household Assistant · Recipes, Tasks, Expenses')
-              : family?.members.map((m) => m.displayName).join(', ')}
+
+          <p className="muted" style={{ fontSize: 14.5, margin: '0 auto 40px', maxWidth: 360, lineHeight: 1.5 }}>
+            Add groceries, tasks, bills or a meal, in Malayalam or English.
+          </p>
+
+          {/* Central Large Mic Button */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 40 }}>
+            <button
+              type="button"
+              onClick={() => setAiModalOpen(true)}
+              style={{
+                width: 76,
+                height: 76,
+                borderRadius: '50%',
+                background: 'var(--brand)',
+                color: 'var(--on-brand)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                transition: 'transform 0.15s ease',
+              }}
+              aria-label="Start voice input"
+            >
+              <Icon name="mic" size={32} />
+            </button>
+          </div>
+
+          {/* Sample Voice Transcript Bubble */}
+          <div
+            className="font-serif"
+            style={{
+              fontSize: 20,
+              fontStyle: 'italic',
+              color: 'var(--text)',
+              marginBottom: 20,
+            }}
+          >
+            “Add green chilli and tomato to the list.”
+          </div>
+
+          {/* Result Confirmation Card */}
+          <div
+            style={{
+              background: 'var(--surface-2)',
+              border: '1px solid var(--line)',
+              borderRadius: 14,
+              padding: '12px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 48,
+              textAlign: 'left',
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 13.5, fontWeight: 600 }}>Added to Shopping</div>
+              <div className="muted tiny" style={{ marginTop: 2 }}>Green Chilli, Tomato</div>
+            </div>
+            <button
+              type="button"
+              className="editorial-link"
+              style={{ fontSize: 13 }}
+              onClick={() => {}}
+            >
+              Undo
+            </button>
+          </div>
+
+          {/* Family Activity Feed */}
+          <div style={{ textAlign: 'left', borderTop: '1px solid var(--line)', paddingTop: 20 }}>
+            <div className="section-label" style={{ marginBottom: 12 }}>
+              FAMILY ACTIVITY
+            </div>
+            <div className="col" style={{ gap: 0 }}>
+              {recentActivities.map((act) => (
+                <div key={act.id}>
+                  <div className="row between" style={{ padding: '10px 0', fontSize: 13.5 }}>
+                    <span>{act.text}</span>
+                    <span className="muted tiny">{act.time}</span>
+                  </div>
+                  <hr className="editorial-divider" />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-
-        {/* Mode Toggle Switch */}
-        <div style={{ display: 'inline-flex', padding: 3, background: 'var(--surface-2)', borderRadius: 20, border: '1px solid var(--line)' }}>
-          <button
-            type="button"
-            onClick={() => switchMode('family')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '6px 14px',
-              borderRadius: 16,
-              fontSize: 12,
-              fontWeight: 600,
-              border: 'none',
-              cursor: 'pointer',
-              background: mode === 'family' ? 'var(--surface)' : 'transparent',
-              color: mode === 'family' ? 'var(--brand)' : 'var(--muted)',
-              boxShadow: mode === 'family' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <Icon name="family" size={14} />
-            <span>{lang === 'ml' ? 'കുടുംബ ചാറ്റ്' : 'Family Chat'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => switchMode('ai')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '6px 14px',
-              borderRadius: 16,
-              fontSize: 12,
-              fontWeight: 600,
-              border: 'none',
-              cursor: 'pointer',
-              background: mode === 'ai' ? 'var(--brand)' : 'transparent',
-              color: mode === 'ai' ? '#FFFFFF' : 'var(--muted)',
-              boxShadow: mode === 'ai' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <Icon name="sparkles" size={14} />
-            <span>{lang === 'ml' ? 'Hommi AI' : 'Hommi AI'}</span>
-          </button>
+      ) : (
+        <div style={{ maxWidth: 720, margin: '0 auto' }}>
+          <ChatPanel />
         </div>
-      </div>
+      )}
 
-      <div className="card chat-card-wrap">
-        {mode === 'family' ? <ChatPanel /> : <AgenticChatPanel />}
-      </div>
+      {aiModalOpen ? (
+        <AiAssistantModal
+          onClose={() => setAiModalOpen(false)}
+          onDone={() => setAiModalOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }
