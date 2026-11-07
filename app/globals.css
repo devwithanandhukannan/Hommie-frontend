@@ -2055,11 +2055,9 @@ html[data-theme='light'] .toast {
   flex-shrink: 0;
   transition: transform 0.15s ease;
 }
-.cal-event-badge.circle {
-  border-radius: 50%;
-}
+.cal-event-badge.circle,
 .cal-event-badge.squircle {
-  border-radius: 28%;
+  border-radius: 50%;
 }
 [data-theme='dark'] .cal-event-badge {
   border-color: #1C1C1E;

@@ -16,19 +16,19 @@ export function getEventVisual(ev) {
 
   // 1. BRAND SUBSCRIPTIONS (Netflix, Spotify, Apple TV, ChatGPT)
   if (/netflix/i.test(t)) {
-    return { bg: '#000000', color: '#E50914', dot: status === 'paid' ? '#10B981' : '#06B6D4', brand: 'netflix', shape: 'squircle' };
+    return { bg: '#000000', color: '#E50914', dot: status === 'paid' ? '#10B981' : '#06B6D4', brand: 'netflix', shape: 'circle' };
   }
   if (/spotify/i.test(t)) {
-    return { bg: '#1DB954', color: '#FFFFFF', dot: status === 'paid' ? '#10B981' : '#06B6D4', brand: 'spotify', shape: 'squircle' };
+    return { bg: '#1DB954', color: '#FFFFFF', dot: status === 'paid' ? '#10B981' : '#06B6D4', brand: 'spotify', shape: 'circle' };
   }
   if (/apple|icloud|apple\s*tv/i.test(t)) {
-    return { bg: '#000000', color: '#FFFFFF', dot: status === 'paid' ? '#10B981' : '#06B6D4', brand: 'apple', shape: 'squircle' };
+    return { bg: '#000000', color: '#FFFFFF', dot: status === 'paid' ? '#10B981' : '#06B6D4', brand: 'apple', shape: 'circle' };
   }
   if (/chatgpt|openai/i.test(t)) {
-    return { bg: '#10A37F', color: '#FFFFFF', dot: status === 'paid' ? '#10B981' : '#06B6D4', brand: 'chatgpt', shape: 'squircle' };
+    return { bg: '#10A37F', color: '#FFFFFF', dot: status === 'paid' ? '#10B981' : '#06B6D4', brand: 'chatgpt', shape: 'circle' };
   }
 
-  // 2. BILLS & BILL PAYMENTS (Distinct Squircle Shape + Bold Rupee / Receipt / Utility Glyphs)
+  // 2. BILLS & BILL PAYMENTS (Round Rupee / Receipt / Utility Glyphs)
   if (type === 'bill' || type === 'loan_emi') {
     // Bill Payment (PAID bill status)
     if (status === 'paid') {
@@ -37,38 +37,57 @@ export function getEventVisual(ev) {
         color: '#B45309',
         dot: '#10B981',
         icon: 'rupee_paid', // Dedicated Paid Rupee sign with green checkmark seal
-        shape: 'squircle',
+        shape: 'circle',
       };
     }
 
     // Specific utility bills (unpaid / due)
     if (kind === 'electricity' || /electric|power|current|kseb|bescom|tneb/i.test(t)) {
-      return { bg: '#FEF3C7', color: '#D97706', dot: '#F59E0B', icon: 'bolt', shape: 'squircle' };
+      return { bg: '#FEF3C7', color: '#D97706', dot: '#F59E0B', icon: 'bolt', shape: 'circle' };
     }
     if (kind === 'water' || /water|jal/i.test(t)) {
-      return { bg: '#E0F2FE', color: '#0284C7', dot: '#0284C7', icon: 'water', shape: 'squircle' };
+      return { bg: '#E0F2FE', color: '#0284C7', dot: '#0284C7', icon: 'water', shape: 'circle' };
     }
     if (kind === 'internet' || /wifi|broadband|airtel|jio|act|fibernet/i.test(t)) {
-      return { bg: '#F3E8FF', color: '#7C3AED', dot: '#7C3AED', icon: 'wifi', shape: 'squircle' };
+      return { bg: '#F3E8FF', color: '#7C3AED', dot: '#7C3AED', icon: 'wifi', shape: 'circle' };
     }
     if (kind === 'phone' || /phone|mobile|recharge/i.test(t)) {
-      return { bg: '#DCFCE7', color: '#16A34A', dot: '#16A34A', icon: 'phone', shape: 'squircle' };
+      return { bg: '#DCFCE7', color: '#16A34A', dot: '#16A34A', icon: 'phone', shape: 'circle' };
     }
     if (kind === 'gas' || /gas|lpg|cylinder|indane|hp/i.test(t)) {
-      return { bg: '#FFEDD5', color: '#EA580C', dot: '#EA580C', icon: 'flame', shape: 'squircle' };
+      return { bg: '#FFEDD5', color: '#EA580C', dot: '#EA580C', icon: 'flame', shape: 'circle' };
     }
     if (kind === 'rent' || /rent|maintenance|house|flat/i.test(t)) {
-      return { bg: '#EEF2FF', color: '#4F46E5', dot: '#6366F1', icon: 'home', shape: 'squircle' };
+      return { bg: '#EEF2FF', color: '#4F46E5', dot: '#6366F1', icon: 'home', shape: 'circle' };
     }
     if (type === 'loan_emi' || /emi|loan|credit\s*card/i.test(t)) {
-      return { bg: '#FFE4E6', color: '#E11D48', dot: '#F43F5E', icon: 'card', shape: 'squircle' };
+      return { bg: '#FFE4E6', color: '#E11D48', dot: '#F43F5E', icon: 'card', shape: 'circle' };
     }
     // Generic Due Bill
-    return { bg: '#FEF3C7', color: '#B45309', dot: '#EF4444', icon: 'bill_due', shape: 'squircle' };
+    return { bg: '#FEF3C7', color: '#B45309', dot: '#EF4444', icon: 'bill_due', shape: 'circle' };
   }
 
   // 3. TASKS & CHORES (Always Distinct Circle Shape + Checklist / Checkmark / Sparkle Glyphs)
   if (type === 'task') {
+    // Bill payment task
+    if (kind === 'bill' || /pay\s|bill|current|rent|emi|electricity/i.test(t)) {
+      if (status === 'done') {
+        return {
+          bg: '#FEF3C7',
+          color: '#B45309',
+          dot: '#10B981',
+          icon: 'rupee_paid',
+          shape: 'circle',
+        };
+      }
+      return {
+        bg: '#FEF3C7',
+        color: '#B45309',
+        dot: '#EF4444',
+        icon: 'bill_due',
+        shape: 'circle',
+      };
+    }
     // Completed Task
     if (status === 'done') {
       return {
