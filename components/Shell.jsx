@@ -1,34 +1,35 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth, useData } from '@/lib/auth';
 import { Icon, Sheet, Btn, Badge } from '@/components/ui';
 import { applyTheme, getSavedTheme } from '@/lib/theme';
 import PermissionsPrompt from '@/components/PermissionsPrompt';
 import PwaInstallPrompt from '@/components/PwaInstallPrompt';
 import QuickActionFab from '@/components/QuickActionFab';
-import AiAssistantModal from '@/components/AiAssistantModal';
 
 const MAIN_NAV = [
-  ['/dashboard', 'Today'],
-  ['/planner', 'Plan'],
-  ['/money', 'Money'],
-  ['/chat', 'Chat'],
+  ['/dashboard', 'nav.today', 'home'],
+  ['/chat', 'nav.chat', 'chat'],
+  ['/planner', 'nav.planner', 'tasks'],
+  ['/money', 'nav.money', 'money'],
 ];
 
 const MORE_NAV = [
-  ['/medicine', 'Medicine'],
-  ['/documents', 'Documents'],
-  ['/special-days', 'Special days'],
-  ['/family', 'Family'],
+  ['/medicine', 'nav.medicine', 'med'],
+  ['/documents', 'nav.documents', 'docs'],
+  ['/special-days', 'nav.days', 'days'],
+  ['/family', 'nav.family', 'family'],
+  ['/settings', 'nav.settings', 'settings'],
 ];
 
-const MOBILE_TABS = [
-  ['/dashboard', 'Today'],
-  ['/planner', 'Plan'],
-  ['/money', 'Money'],
-  ['/chat', 'Chat'],
+const TABS = [
+  ['/dashboard', 'nav.today', 'home'],
+  ['/chat', 'nav.chat', 'chat'],
+  ['/planner', 'nav.planner', 'tasks'],
+  ['/money', 'nav.money', 'money'],
+  ['/more', 'nav.more', 'menu'],
 ];
 
 function FamilySwitcher({ onClose }) {
@@ -74,36 +75,23 @@ export default function Shell({ children }) {
   const { family, families, familyId, t, user } = useAuth();
   const path = usePathname();
   const [open, setOpen] = useState(false);
-  const [voiceOpen, setVoiceOpen] = useState(false);
   const notes = useData('/me/notifications', { interval: 60000 });
   const unread = notes.data?.unread || 0;
-  const chatUnread = families?.find((f) => f.id === familyId)?.unreadChat || 0;
-
+  const chatUnread = families.find((f) => f.id === familyId)?.unreadChat || 0;
   const isTabActive = (href) => {
-    if (href === '/dashboard') return path === '/dashboard' || path === '/';
-    if (href === '/chat') return path === '/chat';
+    if (href === '/dashboard') return path === '/dashboard' ? 'page' : undefined;
+    if (href === '/chat') return path === '/chat' ? 'page' : undefined;
     if (href === '/planner') {
-      return ['/planner', '/tasks', '/grocery', '/meals', '/recipes', '/calendar'].some((p) => path === p || path.startsWith(`${p}/`));
+      return ['/planner', '/tasks', '/grocery', '/meals', '/recipes', '/calendar'].some((p) => path === p || path.startsWith(`${p}/`)) ? 'page' : undefined;
     }
     if (href === '/money') {
-      return ['/money', '/bills'].some((p) => path === p || path.startsWith(`${p}/`));
+      return ['/money', '/bills'].some((p) => path === p || path.startsWith(`${p}/`)) ? 'page' : undefined;
     }
-    if (href === '/medicine') return path === '/medicine' || path.startsWith('/medicine/');
-    if (href === '/documents') return path === '/documents' || path.startsWith('/documents/');
-    if (href === '/special-days') return path === '/special-days' || path.startsWith('/special-days/');
-    if (href === '/family') return path === '/family' || path === '/settings';
-    return path === href || path.startsWith(`${href}/`);
+    if (href === '/more') {
+      return ['/more', '/medicine', '/documents', '/special-days', '/family', '/settings'].some((p) => path === p || path.startsWith(`${p}/`)) ? 'page' : undefined;
+    }
+    return (path === href || path.startsWith(`${href}/`)) ? 'page' : undefined;
   };
-
-  const isSettingsActive = path === '/settings' || path === '/family';
-
-  // Format today's date for mobile topbar (e.g. "SAT · 7 NOV")
-  const dateFormatted = useMemo(() => {
-    const now = new Date();
-    const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-    return `${days[now.getDay()]} · ${now.getDate()} ${months[now.getMonth()]}`;
-  }, []);
 
   useEffect(() => {
     const saved = getSavedTheme();
@@ -121,185 +109,126 @@ export default function Shell({ children }) {
     }
   }, []);
 
+  const switcher = (
+    <button type="button" onClick={() => setOpen(true)} className="row" aria-label="Switch family" style={{ minHeight: 44, padding: '0 14px', border: '1px solid var(--line)', borderRadius: 999, background: 'var(--surface)', fontWeight: 700, cursor: 'pointer', gap: 10 }}>
+      <span
+        style={{
+          width: 24,
+          height: 24,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        <img src="/icon.svg?v=2" alt="Home" width="22" height="22" style={{ objectFit: 'contain' }} />
+      </span>
+      <span style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{family?.name || 'Family'}</span>
+      <Icon name="swap" size={16} />
+    </button>
+  );
+  const bell = (
+    <Link href="/notifications" className="icon-btn" aria-label={`Notifications${unread ? `, ${unread} new` : ''}`}>
+      <Icon name="bell" />{unread ? <span className="count">{unread > 9 ? '9+' : unread}</span> : null}
+    </Link>
+  );
+
   return (
     <div className="shell">
-      {/* Desktop Editorial Left Sidebar */}
       <aside className="side" aria-label="Main navigation">
-        <Link href="/dashboard" className="brand-title">
-          Hommi
-        </Link>
-
-        <nav className="col" style={{ gap: 4 }}>
-          {MAIN_NAV.map(([href, label]) => {
-            const active = isTabActive(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className="navlink"
-                aria-current={active ? 'page' : undefined}
-              >
-                <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                  {active ? <span className="active-dot" /> : <span className="active-dot-placeholder" />}
-                  <span>{label}</span>
-                </span>
-                {href === '/chat' && chatUnread ? (
-                  <span className="badge danger" style={{ marginLeft: 'auto', padding: '1px 6px', fontSize: 10 }}>
-                    {chatUnread}
-                  </span>
-                ) : null}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="section-label" style={{ margin: '28px 0 8px 13px' }}>
-          MORE
+        <div className="row between" style={{ marginBottom: 10 }}>
+          {switcher}
+          <div className="row" style={{ gap: 6 }}>
+            {bell}
+          </div>
         </div>
-
-        <nav className="col" style={{ gap: 4 }}>
-          {MORE_NAV.map(([href, label]) => {
-            const active = isTabActive(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className="navlink"
-                aria-current={active ? 'page' : undefined}
-              >
-                <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                  {active ? <span className="active-dot" /> : <span className="active-dot-placeholder" />}
-                  <span>{label}</span>
-                </span>
-              </Link>
-            );
-          })}
-        </nav>
-
+        {MAIN_NAV.map(([href, key, icon]) => (
+          <Link key={href} href={href} className="navlink" aria-current={isTabActive(href)}>
+            <span className="row"><Icon name={icon} size={20} />{t(key)}</span>
+            {href === '/chat' && chatUnread ? <span className="badge danger">{chatUnread}</span> : null}
+          </Link>
+        ))}
+        <div style={{ margin: '14px 0 6px 12px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--muted)', letterSpacing: '0.04em' }}>
+          {t('nav.more')}
+        </div>
+        {MORE_NAV.map(([href, key, icon]) => (
+          <Link key={href} href={href} className="navlink" aria-current={isTabActive(href)}>
+            <span className="row"><Icon name={icon} size={20} />{t(key)}</span>
+          </Link>
+        ))}
         <div style={{ flex: 1 }} />
-
-        {/* User Account / Settings at Bottom */}
         <Link
           href="/settings"
-          className="row"
+          className="row between"
           style={{
-            marginTop: 'auto',
-            padding: '10px 0',
+            padding: '10px 12px',
             color: 'var(--text)',
             textDecoration: 'none',
-            gap: 10,
-            alignItems: 'center',
+            borderRadius: 12,
+            background: path === '/settings' ? 'var(--brand-soft)' : 'transparent',
+            transition: 'background 0.15s ease',
           }}
           title="Account & Settings"
-          aria-current={isSettingsActive ? 'page' : undefined}
         >
-          {isSettingsActive ? <span className="active-dot" /> : <span className="active-dot-placeholder" />}
-          <span
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: '50%',
-              background: 'var(--brand)',
-              color: 'var(--on-brand)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 11,
-              fontWeight: 700,
-              flexShrink: 0,
-            }}
-          >
-            {(user?.name || 'A')[0].toUpperCase()}
-          </span>
-          <span
-            style={{
-              fontSize: 14,
-              fontWeight: 500,
-              maxWidth: 130,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {user?.name || 'Anandhu'}
-          </span>
+          <div className="row" style={{ gap: 8 }}>
+            <span
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: '50%',
+                background: 'var(--brand)',
+                color: 'var(--on-brand)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+            >
+              {(user?.name || 'U')[0].toUpperCase()}
+            </span>
+            <span className="small bold" style={{ maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user?.name || 'User'}
+            </span>
+          </div>
+          <Icon name="settings" size={16} />
         </Link>
       </aside>
-
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <main className={`main ${path === '/chat' ? 'main-chat' : ''}`}>
-          {/* Mobile Top Header (SAT · 7 NOV + Avatar) */}
           <div className="topbar mobile-only">
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)' }}>
-              {dateFormatted}
-            </div>
-            <div className="row" style={{ gap: 10 }}>
-              {families.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={() => setOpen(true)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    cursor: 'pointer',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: 'var(--muted)',
-                  }}
-                >
-                  {family?.name}
-                </button>
-              ) : null}
-              <Link href="/more" style={{ textDecoration: 'none' }} aria-label="My Profile">
-                <span
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    background: 'var(--brand)',
-                    color: 'var(--on-brand)',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 12,
-                    fontWeight: 700,
-                  }}
-                >
-                  {(user?.name || 'A')[0].toUpperCase()}
-                </span>
-              </Link>
+            {switcher}
+            <div className="row" style={{ gap: 6 }}>
+              {bell}
             </div>
           </div>
-
           {children}
         </main>
-
-        {/* Mobile Editorial Bottom Bar */}
         <nav className="tabbar mobile-only" aria-label="Main navigation">
-          {MOBILE_TABS.map(([href, label]) => {
-            const isCurrent = isTabActive(href);
+          {TABS.map(([href, key, icon]) => {
+            const isCurrent = Boolean(isTabActive(href));
             return (
               <Link
                 key={href}
                 href={href}
                 className={`tab ${isCurrent ? 'active' : ''}`}
                 aria-current={isCurrent ? 'page' : undefined}
+                aria-label={t(key)}
               >
-                {isCurrent ? <span className="active-dot" style={{ margin: 0, width: 4, height: 4 }} /> : null}
-                <span>{label}</span>
-                {href === '/chat' && chatUnread ? <span className="tab-unread-dot" /> : null}
+                <span className="tab-icon-wrap">
+                  <Icon name={icon} size={isCurrent ? 18 : 20} />
+                  {href === '/chat' && chatUnread ? <span className="tab-unread-dot" /> : null}
+                </span>
+                {isCurrent ? <span className="tab-label">{t(key)}</span> : null}
               </Link>
             );
           })}
         </nav>
       </div>
-
       {open ? <FamilySwitcher onClose={() => setOpen(false)} /> : null}
       <PermissionsPrompt />
       <PwaInstallPrompt />
       <QuickActionFab />
-      {voiceOpen ? <AiAssistantModal onClose={() => setVoiceOpen(false)} onDone={() => setVoiceOpen(false)} /> : null}
     </div>
   );
 }

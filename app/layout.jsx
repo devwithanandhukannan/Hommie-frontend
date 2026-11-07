@@ -22,7 +22,7 @@ export const metadata = {
   },
   robots: { index: false, follow: false },
 };
-export const viewport = { themeColor: '#FAF7F2', width: 'device-width', initialScale: 1 };
+export const viewport = { themeColor: '#0B6B5D', width: 'device-width', initialScale: 1 };
 
 export default function RootLayout({ children }) {
   return (
