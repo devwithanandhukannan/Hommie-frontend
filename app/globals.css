@@ -897,6 +897,68 @@ html[data-theme='light'] .toast {
   margin: 0 auto;
   width: 100%;
 }
+.chat-editorial-topbar {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.chat-editorial-label {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.chat-editorial-tabs {
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+  border-bottom: 1.5px solid var(--line);
+  padding-bottom: 4px;
+}
+.chat-editorial-tab {
+  background: none;
+  border: none;
+  padding: 0 0 6px 0;
+  font-size: 19px;
+  font-family: Newsreader, Georgia, Charter, serif;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.15s ease;
+}
+.chat-editorial-tab.active {
+  color: var(--text);
+  font-weight: 700;
+}
+.chat-editorial-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -5.5px;
+  height: 2px;
+  background: var(--text);
+}
+.chat-ai-pill {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+[data-theme='dark'] .chat-ai-pill {
+  background: rgba(255, 255, 255, 0.12);
+  color: #F5F5F7;
+}
 .chat-header-bar {
   margin-bottom: 10px;
 }
@@ -928,6 +990,15 @@ html[data-theme='light'] .toast {
     margin: 0;
     display: flex;
     flex-direction: column;
+  }
+  .main.main-chat .chat-editorial-topbar {
+    padding: 0 4px 4px;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+  }
+  .main.main-chat .chat-editorial-tab {
+    font-size: 18px;
+    padding-bottom: 4px;
   }
   .main.main-chat .chat-header-bar {
     padding: 2px 4px 6px;
@@ -990,77 +1061,91 @@ html[data-theme='light'] .toast {
 }
 .chat-date-pill {
   display: inline-block;
-  padding: 4px 14px;
-  background: var(--surface);
+  padding: 2px 10px;
+  background: var(--surface-2);
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 10.5px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   border-radius: 9999px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  border: none;
-  letter-spacing: -0.01em;
+  border: 1px solid var(--line);
+  box-shadow: none;
 }
 
-/* System messages - Borderless with category colors */
+/* System messages - Modern Minimalist Editorial Log Entry */
 .sys-pill-wrap {
   display: flex;
   justify-content: center;
-  margin: 5px 0;
+  margin: 3px 0;
+  width: 100%;
 }
 .sys-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   font-size: 12px;
   font-weight: 500;
   background: var(--surface-2);
-  color: var(--muted);
+  color: var(--text);
   border-radius: 9999px;
-  padding: 5px 14px;
+  padding: 3px 12px;
   text-align: center;
-  border: none;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--line);
+  box-shadow: none;
+  max-width: 92%;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
   transition: all 0.15s ease;
 }
 .sys-pill-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  opacity: 0.85;
 }
 .sys-pill.task {
-  background: #EFF6FF;
+  background: rgba(37, 99, 235, 0.06);
+  border-color: rgba(37, 99, 235, 0.22);
   color: #1D4ED8;
 }
 [data-theme='dark'] .sys-pill.task {
-  background: #172554;
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.28);
   color: #93C5FD;
 }
 .sys-pill.grocery {
-  background: #ECFDF5;
+  background: rgba(4, 120, 87, 0.06);
+  border-color: rgba(4, 120, 87, 0.22);
   color: #047857;
 }
 [data-theme='dark'] .sys-pill.grocery {
-  background: #064E3B;
+  background: rgba(4, 120, 87, 0.14);
+  border-color: rgba(4, 120, 87, 0.28);
   color: #86EFAC;
 }
 .sys-pill.bill, .sys-pill.pay {
-  background: #FEF3C7;
-  color: #92400E;
+  background: rgba(180, 83, 9, 0.06);
+  border-color: rgba(180, 83, 9, 0.22);
+  color: #B45309;
 }
 [data-theme='dark'] .sys-pill.bill, [data-theme='dark'] .sys-pill.pay {
-  background: #451A03;
+  background: rgba(180, 83, 9, 0.14);
+  border-color: rgba(180, 83, 9, 0.28);
   color: #FDE68A;
 }
 .sys-pill.family {
-  background: #F3F4F6;
-  color: #374151;
+  background: var(--surface-2);
+  border-color: var(--line);
+  color: var(--muted);
 }
 [data-theme='dark'] .sys-pill.family {
-  background: #27272A;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
   color: #D4D4D8;
 }
 .sys-pill-time {
-  opacity: 0.75;
+  opacity: 0.65;
   font-size: 10.5px;
   margin-left: 2px;
 }
@@ -1428,19 +1513,19 @@ html[data-theme='light'] .toast {
   padding: 6px 14px;
   border-radius: 9999px;
   background: var(--surface);
-  border: none;
+  border: 1px solid var(--line);
   color: var(--text);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.15s ease;
 }
 .chat-chip-pill:hover {
   background: var(--surface-2);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 .chat-chip-pill:active {
   transform: scale(0.96);
@@ -1472,17 +1557,19 @@ html[data-theme='light'] .toast {
   align-items: center;
   gap: 8px;
   background: var(--surface);
-  border: none;
+  border: 1.5px solid var(--line);
   border-radius: 9999px;
   padding: 4px 6px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.03);
-  transition: box-shadow 0.2s ease;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
 }
 .chat-pill-bar:focus-within {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border-color: var(--text);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 [data-theme='dark'] .chat-pill-bar {
   background: #1C1C1E;
+  border-color: rgba(255, 255, 255, 0.14);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
 }
 .chat-pill-more-btn {

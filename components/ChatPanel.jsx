@@ -366,6 +366,7 @@ export default function ChatPanel({ compact = false }) {
   const [text, setText] = useState('');
   const [run, busy] = useAction();
   const listRef = useRef(null);
+  const bottomRef = useRef(null);
   const lastId = useRef(null);
   const stick = useRef(true);
   const fileRef = useRef(null);
@@ -451,11 +452,34 @@ export default function ChatPanel({ compact = false }) {
   }, [items]);
 
   const markRead = useCallback(() => { post('/chat/read', {}).catch(() => {}); }, []);
-  const scrollDown = () =>
+
+  const scrollToBottom = useCallback((behavior = 'auto') => {
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior, block: 'end' });
+    }
+    if (listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
+  }, []);
+
+  const scrollDown = useCallback((behavior = 'auto') => {
     requestAnimationFrame(() => {
-      const el = listRef.current;
-      if (el && stick.current) el.scrollTop = el.scrollHeight;
+      scrollToBottom(behavior);
     });
+  }, [scrollToBottom]);
+
+  // When messages load or update, auto-scroll to the newest message at bottom
+  useEffect(() => {
+    if (items && items.length > 0) {
+      scrollToBottom('auto');
+      const t1 = setTimeout(() => scrollToBottom('auto'), 40);
+      const t2 = setTimeout(() => scrollToBottom('auto'), 160);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+  }, [items, scrollToBottom]);
 
   const scrollToMessage = (id) => {
     const el = document.getElementById(`msg-${id}`);
@@ -509,7 +533,8 @@ export default function ChatPanel({ compact = false }) {
     setItems((cur) => [...(cur || []), m]);
     lastId.current = m.id;
     stick.current = true;
-    scrollDown();
+    scrollToBottom('smooth');
+    setTimeout(() => scrollToBottom('smooth'), 50);
     reloadFamily().catch(() => {});
   };
 
@@ -957,6 +982,9 @@ export default function ChatPanel({ compact = false }) {
             </div>
           );
         })}
+
+        {/* Scroll anchor at bottom to keep view on newest messages */}
+        <div ref={bottomRef} style={{ height: 1, minHeight: 1, flexShrink: 0 }} />
       </div>
 
       {/* Refined Minimalist Action Chips (Image 1 Style Quick Pills) */}

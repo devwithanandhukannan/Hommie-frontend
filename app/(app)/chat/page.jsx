@@ -4,10 +4,10 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import ChatPanel from '@/components/ChatPanel';
 import AgenticChatPanel from '@/components/AgenticChatPanel';
 import { useAuth } from '@/lib/auth';
-import { Spinner, Icon } from '@/components/ui';
+import { Spinner } from '@/components/ui';
 
 function ChatPageContent() {
-  const { family, t, lang } = useAuth();
+  const { lang } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const initialMode = searchParams.get('mode') === 'ai' ? 'ai' : 'family';
@@ -27,70 +27,33 @@ function ChatPageContent() {
 
   return (
     <div className="chat-container-page">
-      <div className="chat-header-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-        <div>
-          <h1 className="bold" style={{ fontSize: 18, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-            {mode === 'ai' ? (
-              <>
-                <Icon name="sparkles" size={20} />
-                <span>{lang === 'ml' ? 'Hommi AI ഏജന്റ്' : 'Hommi AI Agent'}</span>
-              </>
-            ) : (
-              t('chat.title')
-            )}
-          </h1>
-          <div className="small muted" style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {mode === 'ai'
-              ? (lang === 'ml' ? 'വീട്ടുസഹായി · ഓർമ്മപ്പെടുത്തലുകൾ, പാചകം, ചിലവുകൾ' : 'Household Assistant · Recipes, Tasks, Expenses')
-              : family?.members.map((m) => m.displayName).join(', ')}
-          </div>
+      {/* Clean Modern Editorial Header - Replaces redundant h1 & Anandhu subtitle to save vertical space */}
+      <div className="chat-editorial-topbar">
+        <div className="chat-editorial-label">
+          CHAT
         </div>
 
-        {/* Mode Toggle Switch */}
-        <div style={{ display: 'inline-flex', padding: 3, background: 'var(--surface-2)', borderRadius: 20, border: '1px solid var(--line)' }}>
+        {/* Clean Editorial Underline Tabs (matches Plan/Shopping reference style) */}
+        <div className="chat-editorial-tabs" role="tablist" aria-label="Chat mode">
           <button
             type="button"
+            role="tab"
+            aria-selected={mode === 'family'}
             onClick={() => switchMode('family')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '6px 14px',
-              borderRadius: 16,
-              fontSize: 12,
-              fontWeight: 600,
-              border: 'none',
-              cursor: 'pointer',
-              background: mode === 'family' ? 'var(--surface)' : 'transparent',
-              color: mode === 'family' ? 'var(--brand)' : 'var(--muted)',
-              boxShadow: mode === 'family' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-              transition: 'all 0.15s ease',
-            }}
+            className={`chat-editorial-tab ${mode === 'family' ? 'active' : ''}`}
           >
-            <Icon name="family" size={14} />
             <span>{lang === 'ml' ? 'കുടുംബ ചാറ്റ്' : 'Family Chat'}</span>
           </button>
+
           <button
             type="button"
+            role="tab"
+            aria-selected={mode === 'ai'}
             onClick={() => switchMode('ai')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '6px 14px',
-              borderRadius: 16,
-              fontSize: 12,
-              fontWeight: 600,
-              border: 'none',
-              cursor: 'pointer',
-              background: mode === 'ai' ? 'var(--brand)' : 'transparent',
-              color: mode === 'ai' ? '#FFFFFF' : 'var(--muted)',
-              boxShadow: mode === 'ai' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-              transition: 'all 0.15s ease',
-            }}
+            className={`chat-editorial-tab ${mode === 'ai' ? 'active' : ''}`}
           >
-            <Icon name="sparkles" size={14} />
-            <span>{lang === 'ml' ? 'Hommi AI' : 'Hommi AI'}</span>
+            <span>Hommi AI</span>
+            <span className="chat-ai-pill">AI</span>
           </button>
         </div>
       </div>

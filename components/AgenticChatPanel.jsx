@@ -38,7 +38,9 @@ export default function AgenticChatPanel() {
   const scrollRef = useRef(null);
 
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+    scrollRef.current?.scrollIntoView({ behavior: 'auto' });
+    const t = setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'auto' }), 60);
+    return () => clearTimeout(t);
   }, [messages, busy]);
 
   useEffect(() => {
