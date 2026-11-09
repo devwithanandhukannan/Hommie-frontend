@@ -1,794 +1,192 @@
 'use client';
-import { useState } from 'react';
-import { del, patch, post } from '@/lib/api';
-import { useAuth, useData } from '@/lib/auth';
-import {
-  Badge,
-  Btn,
-  Empty,
-  ErrorNote,
-  Field,
-  Icon,
-  Input,
-  PageHeader,
-  Select,
-  Sheet,
-  Spinner,
-  useAction,
-  useConfirm,
-  useToast,
-} from '@/components/ui';
-import { timeAgo, toPaise } from '@/lib/format';
+import { useEffect, useRef, useState } from 'react';
+import { post, patch, del } from '@/lib/api';
+import { useAuth, useData, notifyChanged } from '@/lib/auth';
+import { Btn, Empty, ErrorNote, Field, Icon, Input, Sheet, Spinner, UnitButtons, parseQty, formatQty, useAction, useToast } from '@/components/ui';
+import { toPaise, timeAgo } from '@/lib/format';
 
-export const UNITS = [
-  { value: 'pcs', label: 'pcs (pieces)' },
-  { value: 'kg', label: 'kg (kilogram)' },
-  { value: 'g', label: 'g (gram)' },
-  { value: 'L', label: 'L (liter)' },
-  { value: 'ml', label: 'ml (milliliter)' },
-  { value: 'pack', label: 'pack (packet)' },
-  { value: 'doz', label: 'doz (dozen)' },
-  { value: 'box', label: 'box' },
-  { value: 'bottle', label: 'bottle' },
-  { value: 'bunch', label: 'bunch' },
-  { value: 'custom', label: 'Custom unit…' },
-];
-
-export const QUICK_UNITS = ['pcs', 'kg', 'g', 'L', 'ml', 'pack', 'doz'];
-
-export function parseQty(qtyStr) {
-  if (!qtyStr) return { amount: '', unit: 'pcs', custom: '' };
-  const str = String(qtyStr).trim();
-  const match = str.match(/^([\d.,/]+)\s*(.*)$/);
-  if (!match) return { amount: '', unit: 'custom', custom: str };
-  const amount = match[1];
-  const unitRaw = match[2].trim().toLowerCase();
-  if (!unitRaw) return { amount, unit: 'pcs', custom: '' };
-  if (['kg', 'kgs'].includes(unitRaw)) return { amount, unit: 'kg', custom: '' };
-  if (['g', 'gm', 'gms', 'gram', 'grams'].includes(unitRaw)) return { amount, unit: 'g', custom: '' };
-  if (['l', 'ltr', 'liter', 'liters', 'litre', 'litres'].includes(unitRaw)) return { amount, unit: 'L', custom: '' };
-  if (['ml', 'mls'].includes(unitRaw)) return { amount, unit: 'ml', custom: '' };
-  if (['pc', 'pcs', 'piece', 'pieces', 'nos', 'count'].includes(unitRaw)) return { amount, unit: 'pcs', custom: '' };
-  if (['pack', 'packs', 'pkt', 'pkts', 'packet', 'packets'].includes(unitRaw)) return { amount, unit: 'pack', custom: '' };
-  if (['doz', 'dozen', 'dozens'].includes(unitRaw)) return { amount, unit: 'doz', custom: '' };
-  if (['box', 'boxes'].includes(unitRaw)) return { amount, unit: 'box', custom: '' };
-  if (['bottle', 'bottles', 'btl'].includes(unitRaw)) return { amount, unit: 'bottle', custom: '' };
-  if (['bunch', 'bunches'].includes(unitRaw)) return { amount, unit: 'bunch', custom: '' };
-  return { amount, unit: 'custom', custom: match[2].trim() };
-}
-
-export function formatQty(amount, unit, custom) {
-  const cleanAmount = (amount || '').trim();
-  if (!cleanAmount && !custom) return '';
-  if (unit === 'custom') {
-    const cleanCustom = (custom || '').trim();
-    return cleanAmount && cleanCustom ? `${cleanAmount} ${cleanCustom}` : cleanAmount || cleanCustom;
-  }
-  return cleanAmount ? `${cleanAmount} ${unit}` : unit;
-}
-
-function BoughtSheet({ item, onClose, onDone }) {
-  const { t, lang } = useAuth();
-  const [price, setPrice] = useState('');
-  const [run, busy] = useAction();
-
-  const saveWithPrice = async (e) => {
-    if (e) e.preventDefault();
-    const body = {};
-    const p = price ? toPaise(price) : null;
-    if (price && !p) return;
-    if (p) body.price = p;
-    if (await run(() => post(`/grocery/${item.id}/bought`, body), 'Marked as bought')) {
-      onDone();
-      onClose();
-    }
-  };
-
-  const markBoughtLater = async () => {
-    if (await run(() => post(`/grocery/${item.id}/bought`, {}), 'Marked as bought')) {
-      onDone();
-      onClose();
-    }
-  };
-
-  return (
-    <Sheet title={`${t('grocery.bought')} · ${item.name}`} onClose={onClose}>
-      <form className="col" onSubmit={saveWithPrice} style={{ gap: 14 }}>
-        <p className="muted small" style={{ margin: 0, lineHeight: 1.5 }}>
-          {lang === 'ml'
-            ? 'സാധനം വാങ്ങി സ്റ്റോക്കിലേക്ക് മാറ്റാം. തുക ഇപ്പോൾ നൽകാം, അല്ലെങ്കിൽ പിന്നീട് ബിൽ നോക്കി ചേർക്കാം.'
-            : 'Mark item as bought and moved to stock. You can enter the price now, or add it later when checking bills.'}
-        </p>
-        <Field label={t('grocery.field_price')}>
-          {(id) => (
-            <Input
-              id={id}
-              inputMode="decimal"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="120"
-              autoFocus
-            />
-          )}
-        </Field>
-        <p className="tiny muted" style={{ margin: '-4px 0 0' }}>
-          {t('grocery.bought_sub')}
-        </p>
-        <div className="col" style={{ gap: 8, marginTop: 4 }}>
-          {price.trim() ? (
-            <Btn type="submit" disabled={busy}>
-              <Icon name="check" size={16} /> {t('grocery.save_with_price')}
-            </Btn>
-          ) : (
-            <Btn type="button" onClick={markBoughtLater} disabled={busy}>
-              <Icon name="check" size={16} /> {t('grocery.add_price_later')}
-            </Btn>
-          )}
-          {price.trim() ? (
-            <Btn type="button" tone="ghost" onClick={markBoughtLater} disabled={busy}>
-              {t('grocery.add_price_later')}
-            </Btn>
-          ) : (
-            <Btn type="button" tone="ghost" onClick={onClose}>
-              {t('btn.cancel')}
-            </Btn>
-          )}
-        </div>
-      </form>
-    </Sheet>
-  );
-}
-
-function AddPriceSheet({ item, onClose, onDone }) {
+function ItemSheet({ item, onClose, onDone }) {
   const { t } = useAuth();
+  const [name, setName] = useState(item.name);
+  const parsed = parseQty(item.qty);
+  const [amount, setAmount] = useState(parsed.amount);
+  const [unit, setUnit] = useState(parsed.unit);
   const [price, setPrice] = useState(item.lastPrice ? String(item.lastPrice / 100) : '');
   const [run, busy] = useAction();
 
   const save = async (e) => {
     e.preventDefault();
-    const p = toPaise(price);
-    if (!p || p <= 0) return;
-    if (await run(() => post(`/grocery/${item.id}/price`, { price: p }), 'Price recorded')) {
-      onDone();
-      onClose();
-    }
-  };
-
-  return (
-    <Sheet title={`${t('grocery.add_price')} · ${item.name}`} onClose={onClose}>
-      <form className="col" onSubmit={save} style={{ gap: 14 }}>
-        <p className="muted small" style={{ margin: 0, lineHeight: 1.5 }}>
-          {t('grocery.add_price_sub')}
-        </p>
-        <Field label={t('grocery.field_price')}>
-          {(id) => (
-            <Input
-              id={id}
-              inputMode="decimal"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="120"
-              autoFocus
-              required
-            />
-          )}
-        </Field>
-        <div className="row" style={{ gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
-          <Btn type="button" tone="ghost" onClick={onClose}>{t('btn.cancel')}</Btn>
-          <Btn type="submit" disabled={busy || !price.trim()}>
-            <Icon name="check" size={16} /> {t('btn.done')}
-          </Btn>
-        </div>
-      </form>
-    </Sheet>
-  );
-}
-
-function EditGrocerySheet({ item, onClose, onDone }) {
-  const { t } = useAuth();
-  const parsed = parseQty(item.qty);
-  const [name, setName] = useState(item.name || '');
-  const [amount, setAmount] = useState(parsed.amount || '');
-  const [unit, setUnit] = useState(parsed.unit || 'pcs');
-  const [customUnit, setCustomUnit] = useState(parsed.custom || '');
-  const [run, busy] = useAction();
-
-  const save = async (e) => {
-    e.preventDefault();
     const cleanName = name.trim();
     if (!cleanName) return;
-    const cleanQty = formatQty(amount, unit, customUnit);
-    if (await run(() => patch(`/grocery/${item.id}`, { name: cleanName, qty: cleanQty }), 'Item updated')) {
-      onDone();
-      onClose();
-    }
+    const finalQty = formatQty(amount, unit);
+    const ok = await run(async () => {
+      if (cleanName !== item.name || finalQty !== (item.qty || '')) {
+        await patch(`/grocery/${item.id}`, { name: cleanName, qty: finalQty || undefined });
+      }
+      const p = toPaise(price);
+      // Recording the cost also adds it to the family expenses (split equally); repeating it only corrects that expense.
+      if (p && p !== item.lastPrice) {
+        await post(`/grocery/${item.id}/price`, { price: p });
+      }
+    });
+    if (ok) { onDone(); onClose(); }
   };
+  const remove = async () => { if (await run(() => del(`/grocery/${item.id}`))) { onDone(); onClose(); } };
 
   return (
-    <Sheet title={`${t('btn.edit')} · ${item.name}`} onClose={onClose}>
+    <Sheet title={item.name} onClose={onClose}>
       <form className="col" onSubmit={save} style={{ gap: 14 }}>
-        <Field label={t('recipes.field_name')}>
-          {(id) => (
-            <Input
-              id={id}
-              required
-              maxLength={80}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t('grocery.placeholder_name')}
-            />
-          )}
+        <Field label={t('add.grocery')}>
+          {(id) => <Input id={id} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required autoFocus />}
         </Field>
-
-        <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
-          <div style={{ flex: '1 1 110px' }}>
-            <Field label={t('grocery.placeholder_qty')}>
-              {(id) => (
-                <Input
-                  id={id}
-                  maxLength={15}
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="2, 500"
-                />
-              )}
-            </Field>
-          </div>
-          <div style={{ flex: '1 1 140px' }}>
-            <Field label="Unit">
-              {(id) => (
-                <Select id={id} value={unit} onChange={(e) => setUnit(e.target.value)}>
-                  {UNITS.map((u) => (
-                    <option key={u.value} value={u.value}>{u.label}</option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-          </div>
-        </div>
-
-        {unit === 'custom' ? (
-          <Field label="Custom reading label">
-            {(id) => (
+        <Field label={t('grocery.field_qty') || 'Quantity'}>
+          {(id) => (
+            <div className="col" style={{ gap: 8 }}>
               <Input
                 id={id}
-                maxLength={20}
-                value={customUnit}
-                onChange={(e) => setCustomUnit(e.target.value)}
-                placeholder="cans, bunches"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="400, 2, 1.5…"
+                maxLength={30}
               />
-            )}
-          </Field>
-        ) : null}
-
-        <div className="row wrap" style={{ gap: 6 }}>
-          <span className="tiny muted" style={{ width: '100%' }}>{t('grocery.units_label')}</span>
-          {QUICK_UNITS.map((u) => (
-            <button
-              key={u}
-              type="button"
-              className={`unit-chip ${unit === u ? 'active' : ''}`}
-              onClick={() => setUnit(u)}
-            >
-              {u}
-            </button>
-          ))}
-        </div>
-
-        <div className="row" style={{ marginTop: 8, justifyContent: 'flex-end', gap: 10 }}>
-          <Btn tone="ghost" onClick={onClose}>{t('btn.cancel')}</Btn>
-          <Btn type="submit" disabled={busy}>{t('tasks.save_btn')}</Btn>
-        </div>
+              <UnitButtons selected={unit} onSelect={setUnit} />
+            </div>
+          )}
+        </Field>
+        <Field label={`₹ ${t('add.amount')}`} hint="Added to the family expenses, split equally">
+          {(id) => <Input id={id} inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0" />}
+        </Field>
+        <Btn type="submit" disabled={busy || !name.trim()}>{t('btn.save')}</Btn>
+        <Btn type="button" tone="ghost" onClick={remove} disabled={busy}>{t('btn.delete')}</Btn>
       </form>
     </Sheet>
   );
 }
 
-export default function GroceryPage() {
-  const { family, t } = useAuth();
-  const { data, error, loading, reload } = useData('/grocery', { interval: 20000 });
-  const [run, busy] = useAction();
-  const confirm = useConfirm();
+export default function Grocery() {
+  const { t } = useAuth();
   const toast = useToast();
+  const { data, error, loading, reload, setData } = useData('/grocery', { interval: 20000 });
+  const [run] = useAction();
+  const [text, setText] = useState('');
+  const [edit, setEdit] = useState(null);
+  const [showStock, setShowStock] = useState(false);
+  const inputRef = useRef(null);
+  useEffect(() => { if (new URLSearchParams(window.location.search).get('add') === '1') inputRef.current?.focus(); }, []);
 
-  const [name, setName] = useState('');
-  const [amount, setAmount] = useState('');
-  const [unit, setUnit] = useState('pcs');
-  const [customUnit, setCustomUnit] = useState('');
-  const [viewMode, setViewMode] = useState('kanban'); // 'kanban' | 'list'
-
-  const [buying, setBuying] = useState(null);
-  const [editing, setEditing] = useState(null);
-  const [pricing, setPricing] = useState(null);
-
-  // Drag and drop state
-  const [draggingId, setDraggingId] = useState(null);
-  const [dragOverCol, setDragOverCol] = useState(null); // 'needed' | 'stocked'
+  if (loading && !data) return <Spinner />;
+  if (error && !data) return <ErrorNote error={error} />;
+  const items = data || [];
+  const needed = items.filter((g) => g.status === 'needed');
+  const stocked = items.filter((g) => g.status !== 'needed').sort((a, b) => String(b.lastBought?.at || '').localeCompare(String(a.lastBought?.at || '')));
+  const changed = () => { notifyChanged(); reload(); };
 
   const add = async (e) => {
     e.preventDefault();
-    const cleanName = name.trim();
-    if (!cleanName) return;
-    const cleanQty = formatQty(amount, unit, customUnit);
-    const body = { name: cleanName };
-    if (cleanQty) body.qty = cleanQty;
-
-    if (await run(() => post('/grocery', body), 'Added to grocery list')) {
-      setName('');
-      setAmount('');
-      setCustomUnit('');
-      reload();
-    }
+    const names = text.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean);
+    if (!names.length) return;
+    setText('');
+    if (!(await run(async () => { for (const name of names) await post('/grocery', { name }); }))) setText(names.join(', '));
+    else changed();
   };
 
-  const removeItem = async (item) => {
-    const ok = await confirm({
-      title: `Remove ${item.name}?`,
-      message: 'This will remove the item from your family grocery list.',
-      confirmText: t('btn.remove'),
-      tone: 'danger',
-    });
-    if (ok) {
-      if (await run(() => del(`/grocery/${item.id}`), `Removed ${item.name}`)) {
-        reload();
-      }
-    }
-  };
-
-  const markBought = async (item) => {
-    if (await run(() => post(`/grocery/${item.id}/bought`, {}), `Marked ${item.name} as bought`)) {
-      reload();
-    }
-  };
-
-  const markNeeded = async (item) => {
-    if (await run(() => post(`/grocery/${item.id}/need`, {}), `Added ${item.name} to needed`)) {
-      reload();
-    }
-  };
-
-  const items = data || [];
-  const needed = items.filter((g) => g.status === 'needed');
-  const stocked = items.filter((g) => g.status !== 'needed');
-
-  const last = (g) =>
-    g.lastBought
-      ? `Last bought by ${g.lastBought.by?.displayName || '—'} ${timeAgo(g.lastBought.at)}`
-      : 'Never bought yet';
-
-  // Drag and Drop handlers
-  const handleDragStart = (e, item) => {
-    setDraggingId(item.id);
-    e.dataTransfer.setData('text/plain', item.id);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragEnd = () => {
-    setDraggingId(null);
-    setDragOverCol(null);
-  };
-
-  const handleDragOver = (e, targetCol) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragOverCol !== targetCol) {
-      setDragOverCol(targetCol);
-    }
-  };
-
-  const handleDrop = async (e, targetCol) => {
-    e.preventDefault();
-    const id = e.dataTransfer.getData('text/plain') || draggingId;
-    setDragOverCol(null);
-    setDraggingId(null);
-
-    const item = items.find((g) => g.id === id);
-    if (!item) return;
-
-    if (targetCol === 'stocked' && item.status === 'needed') {
-      await markBought(item);
-    } else if (targetCol === 'needed' && item.status !== 'needed') {
-      await markNeeded(item);
-    }
+  // Tapping the circle is instant: the row moves right away and the server catches up.
+  const flip = async (item, to) => {
+    const prev = items;
+    setData(items.map((g) => (g.id === item.id ? { ...g, status: to === 'bought' ? 'in_stock' : 'needed' } : g)));
+    const ok = await run(() => post(`/grocery/${item.id}/${to === 'bought' ? 'bought' : 'need'}`, {}));
+    if (!ok) setData(prev); else changed();
   };
 
   return (
-    <div className="grocery-page-wrap">
-      <PageHeader title={t('grocery.title')} sub={family?.name}>
-        <div className="row" style={{ gap: 6 }}>
-          <button
-            type="button"
-            className={`btn sm ${viewMode === 'kanban' ? '' : 'ghost'}`}
-            onClick={() => setViewMode('kanban')}
-            title={t('grocery.kanban')}
-          >
-            <Icon name="kanban" size={16} /> {t('grocery.kanban')}
-          </button>
-          <button
-            type="button"
-            className={`btn sm ${viewMode === 'list' ? '' : 'ghost'}`}
-            onClick={() => setViewMode('list')}
-            title={t('grocery.list')}
-          >
-            <Icon name="list" size={16} /> {t('grocery.list')}
-          </button>
-        </div>
-      </PageHeader>
+    <div>
+      <form className="shop-add" onSubmit={add}>
+        <input ref={inputRef} className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder={t('add.grocery_ph')} aria-label={t('add.grocery')} maxLength={400} />
+        <Btn type="submit" disabled={!text.trim()}>{t('btn.add')}</Btn>
+      </form>
 
-      {/* Add Grocery Item Card with Unit Selector */}
-      <div className="card" style={{ marginBottom: 20 }}>
-        <form onSubmit={add} aria-label="Add grocery item">
-          <div className="row wrap" style={{ gap: 8, alignItems: 'center' }}>
-            <Input
-              aria-label="Item name"
-              className="grow"
-              style={{ minWidth: 160 }}
-              maxLength={80}
-              placeholder={t('grocery.placeholder_name')}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-            <Input
-              aria-label="Quantity amount"
-              style={{ width: 95 }}
-              maxLength={15}
-              placeholder={t('grocery.placeholder_qty')}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-            <Select
-              aria-label="Quantity unit"
-              style={{ width: 130 }}
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-            >
-              {UNITS.map((u) => (
-                <option key={u.value} value={u.value}>{u.label}</option>
-              ))}
-            </Select>
-            {unit === 'custom' ? (
-              <Input
-                aria-label="Custom unit label"
-                style={{ width: 110 }}
-                maxLength={20}
-                placeholder="unit"
-                value={customUnit}
-                onChange={(e) => setCustomUnit(e.target.value)}
-              />
-            ) : null}
-            <Btn type="submit" disabled={busy || !name.trim()}>
-              <Icon name="plus" size={16} /> {t('grocery.add')}
-            </Btn>
-          </div>
-
-          {/* Quick unit select pills */}
-          <div className="row wrap" style={{ gap: 6, marginTop: 10, alignItems: 'center' }}>
-            <span className="tiny muted">{t('grocery.units_label')}</span>
-            {QUICK_UNITS.map((u) => (
+      {needed.length === 0 ? <Empty>{t('today.calm')}</Empty> : (
+        <div className="shop-list" role="list">
+          {needed.map((g) => (
+            <div className="shop-row" role="listitem" key={g.id}>
               <button
-                key={u}
                 type="button"
-                className={`unit-chip ${unit === u ? 'active' : ''}`}
-                onClick={() => setUnit(u)}
+                className="moment-check"
+                aria-label={`${g.name} ✓`}
+                onClick={() => flip(g, 'bought')}
+                title="Mark bought"
               >
-                {u}
+                <Icon name="check" size={18} />
               </button>
-            ))}
-          </div>
-        </form>
-      </div>
-
-      {loading && !data ? (
-        <Spinner />
-      ) : error ? (
-        <ErrorNote error={error} />
-      ) : viewMode === 'kanban' ? (
-        /* ================= KANBAN BOARD VIEW ================= */
-        <div className="kanban-grid" aria-label="Grocery Kanban Board">
-          {/* Column 1: Needed */}
-          <div
-            className={`kanban-col ${dragOverCol === 'needed' ? 'drop-over' : ''}`}
-            onDragOver={(e) => handleDragOver(e, 'needed')}
-            onDragLeave={() => setDragOverCol(null)}
-            onDrop={(e) => handleDrop(e, 'needed')}
-          >
-            <div className="kanban-col-head">
-              <div className="row" style={{ gap: 8 }}>
-                <span className="bold" style={{ fontSize: 16 }}>{t('grocery.needed')}</span>
-                <Badge tone="warn">{needed.length}</Badge>
-              </div>
-              <span className="tiny muted">{t('grocery.drop_needed')}</span>
+              <button type="button" className="shop-name" onClick={() => setEdit(g)}>
+                <span>{g.name}</span>
+                {g.qty ? <span className="shop-qty">{g.qty}</span> : null}
+              </button>
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={`Edit ${g.name}`}
+                onClick={() => setEdit(g)}
+                title="Edit item"
+                style={{ opacity: 0.55, flexShrink: 0 }}
+              >
+                <Icon name="edit" size={16} />
+              </button>
             </div>
-
-            <div className="kanban-items-list" style={{ minHeight: 120 }}>
-              {needed.length === 0 ? (
-                <div className="empty" style={{ padding: '32px 16px' }}>
-                  {t('grocery.empty_needed')}<br />
-                  <span className="tiny muted">{t('grocery.drop_needed')}</span>
-                </div>
-              ) : (
-                needed.map((g) => (
-                  <div
-                    key={g.id}
-                    className={`kanban-card ${draggingId === g.id ? 'dragging' : ''}`}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, g)}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <div className="row between" style={{ alignItems: 'flex-start', gap: 8 }}>
-                      <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-                        <span className="drag-handle" title="Drag to move">
-                          <Icon name="drag" size={16} />
-                        </span>
-                        <div>
-                          <div className="bold" style={{ fontSize: 15 }}>{g.name}</div>
-                          <div className="tiny muted" style={{ marginTop: 2 }}>{last(g)}</div>
-                        </div>
-                      </div>
-                      {g.qty ? <span className="qty-pill">{g.qty}</span> : null}
-                    </div>
-
-                    <div className="row between" style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid var(--line-soft)' }}>
-                      <button
-                        type="button"
-                        className="btn sm"
-                        style={{ padding: '4px 10px', fontSize: 12 }}
-                        onClick={() => setBuying(g)}
-                        title="Mark bought and enter price"
-                      >
-                        <Icon name="check" size={14} /> {t('grocery.bought')}
-                      </button>
-                      <div className="row" style={{ gap: 4 }}>
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          aria-label={`Edit ${g.name}`}
-                          onClick={() => setEditing(g)}
-                          title="Edit item"
-                        >
-                          <Icon name="edit" size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          aria-label={`Remove ${g.name}`}
-                          onClick={() => removeItem(g)}
-                          title="Remove item"
-                        >
-                          <Icon name="trash" size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Column 2: In Stock */}
-          <div
-            className={`kanban-col ${dragOverCol === 'stocked' ? 'drop-over' : ''}`}
-            onDragOver={(e) => handleDragOver(e, 'stocked')}
-            onDragLeave={() => setDragOverCol(null)}
-            onDrop={(e) => handleDrop(e, 'stocked')}
-          >
-            <div className="kanban-col-head">
-              <div className="row" style={{ gap: 8 }}>
-                <span className="bold" style={{ fontSize: 16 }}>{t('grocery.in_stock')}</span>
-                <Badge tone="ok">{stocked.length}</Badge>
-              </div>
-              <span className="tiny muted">{t('grocery.drop_bought')}</span>
-            </div>
-
-            <div className="kanban-items-list" style={{ minHeight: 120 }}>
-              {stocked.length === 0 ? (
-                <div className="empty" style={{ padding: '32px 16px' }}>
-                  {t('grocery.empty_stock')}<br />
-                  <span className="tiny muted">{t('grocery.drag_here')}</span>
-                </div>
-              ) : (
-                stocked.map((g) => (
-                  <div
-                    key={g.id}
-                    className={`kanban-card ${draggingId === g.id ? 'dragging' : ''}`}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, g)}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <div className="row between" style={{ alignItems: 'flex-start', gap: 8 }}>
-                      <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-                        <span className="drag-handle" title="Drag to move">
-                          <Icon name="drag" size={16} />
-                        </span>
-                        <div>
-                          <div className="bold" style={{ fontSize: 15 }}>{g.name}</div>
-                          <div className="tiny muted" style={{ marginTop: 2 }}>
-                            {last(g)}{g.avgIntervalDays ? ` · every ${Math.round(g.avgIntervalDays)}d` : ''}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col" style={{ alignItems: 'flex-end', gap: 4 }}>
-                        {g.qty ? <span className="qty-pill">{g.qty}</span> : null}
-                        {g.lastPrice ? <span className="qty-pill" style={{ color: 'var(--ok)', background: 'var(--ok-surface, rgba(16, 185, 129, 0.12))' }}>₹{Math.round(g.lastPrice / 100)}</span> : null}
-                        {g.likelyLow ? <Badge tone="warn">{t('grocery.low')}</Badge> : null}
-                      </div>
-                    </div>
-
-                    <div className="row between wrap" style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid var(--line-soft)', gap: 6 }}>
-                      <div className="row wrap" style={{ gap: 6 }}>
-                        <button
-                          type="button"
-                          className="btn ghost sm"
-                          style={{ padding: '4px 10px', fontSize: 12 }}
-                          onClick={() => markNeeded(g)}
-                          title="Add back to needed"
-                        >
-                          {t('grocery.need_again')}
-                        </button>
-                        {g.lastPrice ? (
-                          <button
-                            type="button"
-                            className="btn ghost sm"
-                            style={{ padding: '4px 8px', fontSize: 12, color: 'var(--brand)', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                            onClick={() => setPricing(g)}
-                            title="Update price"
-                          >
-                            <Icon name="money" size={13} />
-                            <span>₹{Math.round(g.lastPrice / 100)}</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="btn sm"
-                            style={{ padding: '4px 10px', fontSize: 12, background: 'var(--brand-surface, rgba(99, 102, 241, 0.12))', color: 'var(--brand)', border: '1px dashed var(--brand)', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                            onClick={() => setPricing(g)}
-                            title={t('grocery.add_price')}
-                          >
-                            <Icon name="money" size={13} />
-                            <span>+ {t('grocery.add_price')}</span>
-                          </button>
-                        )}
-                      </div>
-                      <div className="row" style={{ gap: 4 }}>
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          aria-label={`Edit ${g.name}`}
-                          onClick={() => setEditing(g)}
-                          title="Edit item"
-                        >
-                          <Icon name="edit" size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          aria-label={`Remove ${g.name}`}
-                          onClick={() => removeItem(g)}
-                          title="Remove item"
-                        >
-                          <Icon name="trash" size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+          ))}
         </div>
-      ) : (
-        /* ================= CLASSIC LIST VIEW ================= */
-        <>
-          <h2 style={{ marginTop: 20 }}>{t('grocery.needed')} ({needed.length})</h2>
-          {needed.length === 0 ? (
-            <Empty>{t('grocery.empty_needed')}</Empty>
-          ) : (
-            <div className="card list">
-              {needed.map((g) => (
-                <div key={g.id} className="item">
-                  <button
-                    type="button"
-                    className="circle"
-                    aria-label={`Mark ${g.name} bought`}
-                    onClick={() => setBuying(g)}
-                  >
-                    <span />
-                  </button>
-                  <div className="grow">
-                    <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-                      <span className="bold">{g.name}</span>
-                      {g.qty ? <span className="qty-pill">{g.qty}</span> : null}
-                    </div>
-                    <div className="small muted">{last(g)}</div>
-                  </div>
-                  <div className="row" style={{ gap: 4 }}>
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      aria-label={`Edit ${g.name}`}
-                      onClick={() => setEditing(g)}
-                    >
-                      <Icon name="edit" size={16} />
-                    </button>
-                    <Btn tone="ghost" size="sm" onClick={() => removeItem(g)}>
-                      {t('btn.remove')}
-                    </Btn>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <h2 style={{ marginTop: 24 }}>{t('grocery.in_stock')} ({stocked.length})</h2>
-          {stocked.length === 0 ? (
-            <Empty>{t('grocery.empty_stock')}</Empty>
-          ) : (
-            <div className="card list">
-              {stocked.map((g) => (
-                <div key={g.id} className="item">
-                  <div className="grow">
-                    <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-                      <span className="bold">{g.name}</span>
-                      {g.qty ? <span className="qty-pill">{g.qty}</span> : null}
-                      {g.lastPrice ? <span className="qty-pill" style={{ color: 'var(--ok)', background: 'var(--ok-surface, rgba(16, 185, 129, 0.12))' }}>₹{Math.round(g.lastPrice / 100)}</span> : null}
-                      {g.likelyLow ? <Badge tone="warn">{t('grocery.low')}</Badge> : null}
-                    </div>
-                    <div className="small muted">
-                      {last(g)}{g.avgIntervalDays ? ` · about every ${Math.round(g.avgIntervalDays)} days` : ''}
-                    </div>
-                  </div>
-                  <div className="row wrap" style={{ gap: 6, alignItems: 'center' }}>
-                    {g.lastPrice ? (
-                      <Btn size="sm" tone="ghost" onClick={() => setPricing(g)} title="Update price" style={{ color: 'var(--brand)' }}>
-                        <Icon name="money" size={13} /> ₹{Math.round(g.lastPrice / 100)}
-                      </Btn>
-                    ) : (
-                      <Btn size="sm" onClick={() => setPricing(g)} title={t('grocery.add_price')} style={{ background: 'var(--brand-surface, rgba(99, 102, 241, 0.12))', color: 'var(--brand)', border: '1px dashed var(--brand)' }}>
-                        <Icon name="money" size={13} /> {t('grocery.add_price')}
-                      </Btn>
-                    )}
-                    <Btn size="sm" tone="ghost" onClick={() => markNeeded(g)}>
-                      {t('grocery.need_again')}
-                    </Btn>
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      aria-label={`Edit ${g.name}`}
-                      onClick={() => setEditing(g)}
-                    >
-                      <Icon name="edit" size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      aria-label={`Remove ${g.name}`}
-                      onClick={() => removeItem(g)}
-                    >
-                      <Icon name="trash" size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
       )}
 
-      {/* Bought Price Sheet */}
-      {buying ? (
-        <BoughtSheet item={buying} onClose={() => setBuying(null)} onDone={reload} />
+      {stocked.length ? (
+        <>
+          <button type="button" className="link-btn" style={{ marginTop: 14 }} onClick={() => setShowStock((v) => !v)} aria-expanded={showStock}>
+            {showStock ? '▾' : '▸'} {t('grocery.in_stock') || 'In stock'} ({stocked.length})
+          </button>
+          {showStock ? (
+            <div className="shop-list" role="list">
+              {stocked.map((g) => (
+                <div className="shop-row is-stock" role="listitem" key={g.id}>
+                  <button
+                    type="button"
+                    className="moment-check done"
+                    aria-label={`${g.name} in stock`}
+                    onClick={() => flip(g, 'need')}
+                    title="Move back to needed"
+                  >
+                    <Icon name="check" size={18} />
+                  </button>
+                  <button type="button" className="shop-name" onClick={() => setEdit(g)}>
+                    <span>{g.name}</span>
+                    {g.qty ? <span className="shop-qty">{g.qty}</span> : null}
+                    {g.lastPrice ? <span className="shop-qty price-pill">₹{Math.round(g.lastPrice / 100)}</span> : null}
+                    {g.lastBought?.at ? <span className="shop-qty">· {timeAgo(g.lastBought.at)}</span> : null}
+                  </button>
+                  <button
+                    type="button"
+                    className="moment-act ghost"
+                    onClick={() => flip(g, 'need')}
+                    style={{ minHeight: 36, padding: '0 12px', fontSize: 13 }}
+                  >
+                    {t('grocery.need_again') || 'Need again'}
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label={`Edit ${g.name}`}
+                    onClick={() => setEdit(g)}
+                    title="Edit item"
+                    style={{ opacity: 0.55, flexShrink: 0 }}
+                  >
+                    <Icon name="edit" size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </>
       ) : null}
 
-      {/* Add Price Sheet */}
-      {pricing ? (
-        <AddPriceSheet item={pricing} onClose={() => setPricing(null)} onDone={reload} />
-      ) : null}
-
-      {/* Edit Grocery Sheet */}
-      {editing ? (
-        <EditGrocerySheet item={editing} onClose={() => setEditing(null)} onDone={reload} />
-      ) : null}
+      {edit ? <ItemSheet item={edit} onClose={() => setEdit(null)} onDone={changed} /> : null}
     </div>
   );
 }

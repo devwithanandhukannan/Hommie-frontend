@@ -1,9 +1,11 @@
 'use client';
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { del, post } from '@/lib/api';
-import { useAuth, useData } from '@/lib/auth';
+import { useAuth, useData, notifyChanged } from '@/lib/auth';
 import { Badge, Btn, Empty, ErrorNote, Field, Input, MemberChecks, MemberSelect, PageHeader, Select, Sheet, Spinner, Tabs, useAction, useConfirm } from '@/components/ui';
 import { CATEGORY_LABEL, rupees, shortDate, todayStr, toPaise } from '@/lib/format';
+import BillsPage from '../bills/page';
 
 const ECATS = ['grocery', 'food', 'bills', 'rent', 'tax', 'emi', 'medical', 'transport', 'shopping', 'education', 'entertainment', 'household', 'other'];
 const thisMonth = () => todayStr().slice(0, 7);
@@ -84,11 +86,11 @@ function Expenses() {
                 <div className="bold">{e.note || t('cat.' + e.category) || CATEGORY_LABEL[e.category]}</div>
                 <div className="small muted">
                   {shortDate(e.date)} · {t('cat.' + e.category) || CATEGORY_LABEL[e.category]} · {t('money.paid_by')} {e.paidBy?.displayName}
-                  {e.source !== 'manual' ? ` · ${t('cat.' + e.source) || e.source}` : ''}
+                  {e.source !== 'manual' && e.source !== e.category ? ` · ${t('cat.' + e.source) || e.source}` : ''}
                 </div>
               </div>
               <b>{rupees(e.amount)}</b>
-              <Btn size="sm" tone="ghost" aria-label="Delete expense" onClick={async () => { if (await confirm('Delete this expense?')) run(async () => { await del(`/expenses/${e.id}`); reload(); }, 'Deleted'); }}>{t('btn.delete')}</Btn>
+              {e.source === 'bill' ? null : <Btn size="sm" tone="ghost" aria-label="Delete expense" onClick={async () => { if (await confirm('Delete this expense?')) run(async () => { await del(`/expenses/${e.id}`); notifyChanged(); reload(); }, 'Deleted'); }}>{t('btn.delete')}</Btn>}
             </div>))}
         </div>
       ) : null}
@@ -114,7 +116,8 @@ function SettleForm({ to, amount, onClose, onDone }) {
   );
 }
 function Wallet() {
-  const { t } = useAuth();
+  const { t, family } = useAuth();
+  const [undoRun] = useAction();
   const { data, error, loading, reload } = useData('/wallet');
   const hist = useData('/wallet/settlements');
   const [settle, setSettle] = useState(null);
@@ -131,7 +134,7 @@ function Wallet() {
       {me.youOwe.length ? <section className="card" style={{ marginTop: 12 }}><h2>{t('dash.you_owe')}</h2><div className="list">{me.youOwe.map((o) => <div key={o.member.membershipId} className="item"><div className="grow bold">{o.member.displayName}</div><b>{rupees(o.amount)}</b><Btn size="sm" onClick={() => setSettle(o)}>{t('dash.settle_up')}</Btn></div>)}</div></section> : null}
       {me.owedToYou.length ? <section className="card" style={{ marginTop: 12 }}><h2>{t('dash.owed_to_you')}</h2><div className="list">{me.owedToYou.map((o) => <div key={o.member.membershipId} className="item"><div className="grow bold">{o.member.displayName}</div><b>{rupees(o.amount)}</b></div>)}</div></section> : null}
       <section className="card" style={{ marginTop: 12 }}><h2>{t('tasks.everyone')}</h2><div className="list">{data.balances.map((b) => <div key={b.member.membershipId} className="item"><div className="grow">{b.member.displayName}</div><b>{rupees(b.net, { sign: true })}</b></div>)}</div></section>
-      {hist.data?.length ? <section className="card" style={{ marginTop: 12 }}><h2>{t('money.settle_balances')}</h2><div className="list">{hist.data.map((s) => <div key={s.id} className="item"><div className="grow small">{s.from?.displayName} paid {s.to?.displayName}<div className="muted">{shortDate(s.date)}</div></div><b>{rupees(s.amount)}</b></div>)}</div></section> : null}
+      {hist.data?.length ? <section className="card" style={{ marginTop: 12 }}><h2>{t('money.settle_balances')}</h2><div className="list">{hist.data.map((s) => <div key={s.id} className="item"><div className="grow small">{s.from?.displayName} paid {s.to?.displayName}<div className="muted">{shortDate(s.date)}</div></div><b>{rupees(s.amount)}</b>{s.from?.membershipId === family?.myMembershipId ? <Btn size="sm" tone="ghost" onClick={() => undoRun(async () => { await del(`/wallet/settlements/${s.id}`); notifyChanged(); reload(); hist.reload(); })}>{t('common.undo')}</Btn> : null}</div>)}</div></section> : null}
       {settle ? <SettleForm to={settle.member} amount={settle.amount} onClose={() => setSettle(null)} onDone={() => { reload(); hist.reload(); }} /> : null}
     </>
   );
@@ -194,7 +197,7 @@ function Loans() {
   const confirm = useConfirm();
   return (
     <>
-      <div style={{ marginBottom: 12 }}><Btn onClick={() => setAdding(true)}>{t('money.tab_loans')}</Btn></div>
+      <div style={{ marginBottom: 12 }}><Btn onClick={() => setAdding(true)}>{t('money.add_loan')}</Btn></div>
       {loading && !data ? <Spinner /> : error ? <ErrorNote error={error} /> : !data.length ? <Empty>No loans. Private loans are visible only to you.</Empty> : (
         <div className="col">{data.map((l) => (
           <section key={l.id} className="card">
@@ -235,14 +238,23 @@ function Tax() {
   );
 }
 
-export default function MoneyPage() {
+const TABS = ['expenses', 'wallet', 'bills', 'loans', 'tax'];
+
+function MoneyContent() {
   const { t } = useAuth();
-  const [tab, setTab] = useState('expenses');
+  const router = useRouter();
+  const params = useSearchParams();
+  const [tab, setTab] = useState(TABS.includes(params.get('tab')) ? params.get('tab') : 'expenses');
+  useEffect(() => { const q = params.get('tab'); if (TABS.includes(q)) setTab(q); }, [params]);
+  const change = (next) => { setTab(next); router.replace(`/money?tab=${next}`, { scroll: false }); };
   return (
     <>
-      <PageHeader title={t('money.title')} sub={t('money.sub')} />
-      <Tabs value={tab} onChange={setTab} items={[['expenses', t('money.tab_expenses')], ['wallet', t('money.tab_wallet')], ['loans', t('money.tab_loans')], ['tax', t('money.tab_tax')]]} />
-      <div style={{ marginTop: 12 }}>{tab === 'expenses' ? <Expenses /> : tab === 'wallet' ? <Wallet /> : tab === 'loans' ? <Loans /> : <Tax />}</div>
+      <Tabs value={tab} onChange={change} items={[['expenses', t('money.tab_expenses')], ['wallet', t('money.tab_wallet')], ['bills', t('nav.bills')], ['loans', t('money.tab_loans')], ['tax', t('money.tab_tax')]]} />
+      <div style={{ marginTop: 12 }}>{tab === 'expenses' ? <Expenses /> : tab === 'wallet' ? <Wallet /> : tab === 'bills' ? <BillsPage embedded /> : tab === 'loans' ? <Loans /> : <Tax />}</div>
     </>
   );
+}
+
+export default function MoneyPage() {
+  return <Suspense fallback={<Spinner />}><MoneyContent /></Suspense>;
 }

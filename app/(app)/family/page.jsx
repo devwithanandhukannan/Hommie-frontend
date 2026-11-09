@@ -9,15 +9,44 @@ import { timeAgo } from '@/lib/format';
 const RELATIONS = ['self', 'father', 'mother', 'brother', 'sister', 'spouse', 'partner', 'child', 'grandparent', 'friend', 'other'];
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
-function CodeBox({ title, code, note, onClose }) {
-  const { t } = useAuth();
+function InviteBox({ title, code, note, onClose }) {
+  const { t, family } = useAuth();
+  const toast = useToast();
+  const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/join?code=${encodeURIComponent(code)}`;
+  const message = `${family?.name || 'Hommi'}: ${link}`;
+  const share = async () => {
+    try {
+      if (navigator.share) { await navigator.share({ title: 'Hommi', text: message, url: link }); return; }
+    } catch (e) { if (e?.name === 'AbortError') return; }
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank', 'noopener');
+  };
+  const copy = async () => { try { await navigator.clipboard.writeText(link); toast('✓'); } catch { toast(link); } };
   return (
     <Sheet title={title} onClose={onClose}>
       <div className="col">
-        <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: 2, textAlign: 'center', padding: 12, background: 'var(--surface-2)', borderRadius: 12, userSelect: 'all' }}>{code}</div>
         <p className="small muted" style={{ margin: 0 }}>{note}</p>
-        <Btn onClick={() => navigator.clipboard?.writeText(code)}>{t('family.copy_code')}</Btn>
+        <Btn onClick={share}>{t('family.share_link')}</Btn>
+        <Btn tone="ghost" onClick={copy}>{t('family.copy_link')}</Btn>
+        <details>
+          <summary className="small muted" style={{ cursor: 'pointer' }}>{t('family.copy_code')}</summary>
+          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: 2, textAlign: 'center', padding: 12, marginTop: 8, background: 'var(--surface-2)', borderRadius: 12, userSelect: 'all', overflowWrap: 'anywhere' }}>{code}</div>
+        </details>
       </div>
+    </Sheet>
+  );
+}
+
+/** A proper confirmation dialog: the password is masked (the old native prompt() showed it in clear text). */
+function TypedConfirm({ title, label, type = 'text', danger, onSubmit, onClose }) {
+  const { t } = useAuth();
+  const [v, setV] = useState('');
+  const [run, busy] = useAction();
+  return (
+    <Sheet title={title} onClose={onClose}>
+      <form className="col" onSubmit={async (e) => { e.preventDefault(); if (await run(() => onSubmit(v))) onClose(); }}>
+        <Field label={label}>{(id) => <Input id={id} type={type} autoComplete={type === 'password' ? 'current-password' : 'off'} required autoFocus value={v} onChange={(e) => setV(e.target.value)} />}</Field>
+        <Btn type="submit" tone={danger ? 'danger' : ''} disabled={busy || !v}>{t('btn.delete')}</Btn>
+      </form>
     </Sheet>
   );
 }
@@ -34,7 +63,6 @@ function Members() {
     const r = await run(() => post('/families/current/invites', body));
     if (r && r !== true) setCode({ title: t('family.invite'), code: r.code, note: t('family.invite_account_sub') });
   };
-  const reset = async (m) => { const r = await run(() => post(`/families/current/members/${m.membershipId}/reset-code`, {})); if (r && r !== true) setCode({ title: `${t('family.reset_code')} · ${m.displayName}`, code: r.code, note: `Give this to ${m.displayName}. It expires in ${r.expiresInMinutes} minutes.` }); };
   const addMember = async (e) => { e.preventDefault(); if (await run(() => post('/families/current/members', add), 'Member added')) { setAdd({ displayName: '', relation: 'other', role: 'member' }); reloadFamily(); } };
   const remove = async (m) => { const msg = m.membershipId === me ? 'Leave this family?' : 'Remove ' + m.displayName + '?'; if (await confirm(msg) && await run(() => del(`/families/current/members/${m.membershipId}`), 'Done')) reloadFamily(); };
   const setRole = (m, role) => run(async () => { await patch(`/families/current/members/${m.membershipId}`, { role }); await reloadFamily(); }, 'Role updated');
@@ -46,7 +74,6 @@ function Members() {
             <Avatar member={m} /><div className="grow"><div className="bold">{m.displayName}{m.membershipId === me ? ' (you)' : ''}</div><div className="small muted">{cap(m.relation || 'other')} · {m.role === 'owner' ? t('family.role_owner') : m.role === 'admin' ? t('family.role_admin') : t('family.role_member')}{m.hasAccount === false ? ' · no account yet' : ''}</div></div>
             {owner && m.role !== 'owner' ? <Select aria-label={`Role for ${m.displayName}`} style={{ width: 110 }} value={m.role} onChange={(e) => setRole(m, e.target.value)}><option value="member">{t('family.role_member')}</option><option value="admin">{t('family.role_admin')}</option></Select> : <Badge>{m.role === 'owner' ? t('family.role_owner') : m.role === 'admin' ? t('family.role_admin') : t('family.role_member')}</Badge>}
             {admin && m.hasAccount === false ? <Btn size="sm" onClick={() => invite(m.membershipId)}>{t('family.invite')}</Btn> : null}
-            {admin && m.hasAccount && m.membershipId !== me ? <Btn size="sm" tone="ghost" onClick={() => reset(m)}>{t('family.reset_code')}</Btn> : null}
             {(admin && m.role !== 'owner' && m.membershipId !== me) || (m.membershipId === me && m.role !== 'owner') ? <Btn size="sm" tone="ghost" onClick={() => remove(m)}>{m.membershipId === me ? t('family.leave') : t('family.remove')}</Btn> : null}
           </div>))}
       </div>
@@ -63,7 +90,7 @@ function Members() {
           </form>
         </>
       ) : null}
-      {code ? <CodeBox {...code} onClose={() => setCode(null)} /> : null}
+      {code ? <InviteBox {...code} onClose={() => setCode(null)} /> : null}
     </>
   );
 }
@@ -73,6 +100,7 @@ function Settings() {
   const router = useRouter();
   const [name, setName] = useState(family.name);
   const [muted, setMuted] = useState(false);
+  const [ask, setAsk] = useState(null);
   const [run, busy] = useAction();
   const admin = family.myRole !== 'member';
   useEffect(() => setName(family.name), [family.name]);
@@ -82,8 +110,12 @@ function Settings() {
         <Field label={t('family.title')}>{(id) => <Input id={id} required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />}</Field><Btn type="submit" disabled={busy}>{t('btn.save')}</Btn></form> : null}
       <section className="card"><h2>Chat notifications</h2><label className="check"><input type="checkbox" checked={muted} onChange={(e) => { setMuted(e.target.checked); run(() => post('/families/current/mute-chat', { muted: e.target.checked })); }} /> Mute chat push notifications for this family</label></section>
       {family.myRole === 'owner' ? <section className="card"><h2>Delete family</h2><p className="small muted">Deletes every bill, document and message in {family.name}. This cannot be undone.</p>
-        <Btn tone="danger" onClick={async () => { const c = prompt(`Type "${family.name}" to confirm`); if (c && await run(() => del('/families/current', { confirmName: c }), 'Family deleted')) { await signOut(); router.replace('/login'); } }}>Delete this family</Btn></section> : null}
+        <Btn tone="danger" onClick={() => setAsk('family')}>Delete this family</Btn></section> : null}
       <p className="small muted">Signed in as {user.email}</p>
+      {ask === 'family' ? (
+        <TypedConfirm danger title="Delete family" label={`Type "${family.name}" to confirm`} onClose={() => setAsk(null)}
+          onSubmit={async (c) => { await del('/families/current', { confirmName: c }); await signOut(); router.replace('/login'); }} />
+      ) : null}
     </div>
   );
 }
@@ -99,6 +131,7 @@ function Audit() {
 const b64 = (s) => { const p = '='.repeat((4 - (s.length % 4)) % 4); const r = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from([...r].map((c) => c.charCodeAt(0))); };
 
 function Account() {
+  const [askDelete, setAskDelete] = useState(false);
   const { user, setUser, signOut, t, setLang } = useAuth();
   const toast = useToast();
   const [run, busy] = useAction();
@@ -145,7 +178,11 @@ function Account() {
       <section className="card"><h2>Signed-in devices</h2>
         {sessions.data ? <div className="list">{sessions.data.map((s) => <div key={s.id} className="item"><div className="grow small">{s.device || 'Device'}{s.current ? ' (this one)' : ''}<div className="muted">{timeAgo(s.lastUsedAt)}</div></div>{!s.current ? <Btn size="sm" tone="ghost" onClick={() => run(async () => { await del(`/me/sessions/${s.id}`); sessions.reload(); }, 'Signed out')}>{t('btn.signout')}</Btn> : null}</div>)}</div> : <Spinner />}</section>
       <section className="card"><h2>Delete my account</h2><p className="small muted">Removes your login and leaves every family. Families you own must be transferred or deleted first.</p>
-        <Btn tone="danger" onClick={async () => { const p = prompt('Enter your password to delete your account'); if (p && await run(() => del('/me', { password: p }), 'Account deleted')) await signOut(); }}>Delete account</Btn></section>
+        <Btn tone="danger" onClick={() => setAskDelete(true)}>Delete account</Btn></section>
+      {askDelete ? (
+        <TypedConfirm danger type="password" title="Delete account" label="Enter your password to delete your account" onClose={() => setAskDelete(false)}
+          onSubmit={async (p) => { await del('/me', { password: p }); await signOut(); }} />
+      ) : null}
     </div>
   );
 }

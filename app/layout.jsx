@@ -6,6 +6,7 @@ export const metadata = {
   description: 'Bills, groceries, tasks, medicines, documents and chat for your family',
   applicationName: 'Hommi',
   appleWebApp: { capable: true, title: 'Hommi', statusBarStyle: 'default' },
+  formatDetection: { telephone: false },
   icons: {
     icon: [
       { url: '/favicon.ico?v=2', sizes: 'any' },
@@ -22,7 +23,16 @@ export const metadata = {
   },
   robots: { index: false, follow: false },
 };
-export const viewport = { themeColor: '#0B6B5D', width: 'device-width', initialScale: 1 };
+// viewportFit "cover" lets the app use the full screen on notched phones; the CSS adds the safe-area padding.
+export const viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#F6F5F1' },
+    { media: '(prefers-color-scheme: dark)', color: '#0B0F0E' },
+  ],
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
 
 export default function RootLayout({ children }) {
   return (

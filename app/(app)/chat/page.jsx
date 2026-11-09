@@ -27,29 +27,30 @@ function ChatPageContent() {
 
   return (
     <div className="chat-container-page">
-      <div className="chat-header-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-        {/* Mode Toggle Switch directly at top - removes redundant kudumbachat and anandhu text */}
-        <div style={{ display: 'inline-flex', padding: 3, background: 'var(--surface-2)', borderRadius: 24, border: '1px solid var(--line)', width: '100%', maxWidth: 440 }}>
+      <div className="chat-header-bar">
+        {/* Left Info Column visible on desktop */}
+        <div className="chat-header-info desktop-only">
+          <div className="chat-header-avatar">
+            <Icon name={mode === 'family' ? 'family' : 'sparkles'} size={18} />
+          </div>
+          <div>
+            <div className="chat-header-title">
+              {mode === 'family' ? (family?.name || 'Family Chat') : 'Hommi AI'}
+            </div>
+            <div className="chat-header-sub">
+              {mode === 'family'
+                ? `${family?.memberCount || 1} ${family?.memberCount === 1 ? 'member' : 'members'}`
+                : (lang === 'ml' ? 'നിങ്ങളുടെ AI സഹായി' : 'Personal Family Copilot')}
+            </div>
+          </div>
+        </div>
+
+        {/* Mode Toggle Switch directly at top */}
+        <div className="chat-mode-toggle">
           <button
             type="button"
             onClick={() => switchMode('family')}
-            style={{
-              flex: 1,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              padding: '8px 16px',
-              borderRadius: 20,
-              fontSize: 13.5,
-              fontWeight: 600,
-              border: 'none',
-              cursor: 'pointer',
-              background: mode === 'family' ? 'var(--surface)' : 'transparent',
-              color: mode === 'family' ? 'var(--text)' : 'var(--muted)',
-              boxShadow: mode === 'family' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-              transition: 'all 0.15s ease',
-            }}
+            className={`chat-mode-btn ${mode === 'family' ? 'active' : ''}`}
           >
             <Icon name="family" size={15} />
             <span>{lang === 'ml' ? 'കുടുംബ ചാറ്റ്' : 'Family Chat'}</span>
@@ -57,23 +58,7 @@ function ChatPageContent() {
           <button
             type="button"
             onClick={() => switchMode('ai')}
-            style={{
-              flex: 1,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              padding: '8px 16px',
-              borderRadius: 20,
-              fontSize: 13.5,
-              fontWeight: 600,
-              border: 'none',
-              cursor: 'pointer',
-              background: mode === 'ai' ? 'var(--brand)' : 'transparent',
-              color: mode === 'ai' ? '#FFFFFF' : 'var(--muted)',
-              boxShadow: mode === 'ai' ? '0 1px 4px rgba(0,0,0,0.15)' : 'none',
-              transition: 'all 0.15s ease',
-            }}
+            className={`chat-mode-btn ${mode === 'ai' ? 'active' : ''}`}
           >
             <Icon name="sparkles" size={15} />
             <span>Hommi AI</span>

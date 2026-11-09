@@ -477,7 +477,7 @@ export default function CalendarPage() {
   const [curMonth, setCurMonth] = useState(today.slice(0, 7));
   const [selectedDate, setSelectedDate] = useState(today);
   const [filter, setFilter] = useState('all');
-  const [viewMode, setViewMode] = useState('month'); // 'month' | 'list'
+  const [viewMode, setViewMode] = useState('list'); // 'month' | 'list' (opens on what is coming up)
   const [modal, setModal] = useState(null);
 
   const { data, loading, error, reload } = useData(`/calendar?month=${curMonth}`, { interval: 60000 });
@@ -542,7 +542,7 @@ export default function CalendarPage() {
     const counts = { all: 0, meal: 0, task: 0, bill: 0, special_day: 0, medicine: 0, other: 0 };
     for (const d in byDate) {
       for (const ev of byDate[d]) {
-        counts.all++;
+        if (ev.type !== 'medicine') counts.all++;
         if (counts[ev.type] !== undefined) counts[ev.type]++;
         else counts.other++;
       }
@@ -552,7 +552,7 @@ export default function CalendarPage() {
 
   const selectedEvents = useMemo(() => {
     const list = byDate[selectedDate] || [];
-    if (filter === 'all') return list;
+    if (filter === 'all') return list.filter((e) => e.type !== 'medicine');
     if (filter === 'other') return list.filter((e) => !['meal', 'task', 'bill', 'special_day', 'medicine'].includes(e.type));
     return list.filter((e) => e.type === filter);
   }, [byDate, selectedDate, filter]);
@@ -630,7 +630,7 @@ export default function CalendarPage() {
                   {gridCells.map(({ date, dayNum, isCurrentMonth }) => {
                     const isToday = date === today;
                     const isSelected = date === selectedDate;
-                    const dayEvents = (byDate[date] || []).filter((e) => filter === 'all' || e.type === filter);
+                    const dayEvents = (byDate[date] || []).filter((e) => (filter === 'all' ? e.type !== 'medicine' : e.type === filter));
 
                     // Show up to 2 distinct event badges stacked one over the other
                     const displayEvents = dayEvents.slice(0, 2);
@@ -785,8 +785,8 @@ export default function CalendarPage() {
               {Object.keys(byDate).sort().length === 0 ? (
                 <Empty>No events scheduled for {monthTitle}.</Empty>
               ) : (
-                Object.keys(byDate).sort().map((d) => {
-                  const evs = byDate[d].filter((e) => filter === 'all' || e.type === filter);
+                Object.keys(byDate).sort().filter((d) => d >= today || !d.startsWith(today.slice(0, 7))).map((d) => { // this month: only what is still ahead
+                  const evs = byDate[d].filter((e) => (filter === 'all' ? e.type !== 'medicine' : e.type === filter));
                   if (evs.length === 0) return null;
                   return (
                     <div key={d} style={{ marginBottom: 18 }}>

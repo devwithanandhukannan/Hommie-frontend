@@ -247,12 +247,12 @@ function Schedules() {
   );
 }
 
-export default function BillsPage() {
+export default function BillsPage({ embedded = false }) {
   const { t } = useAuth();
   const [tab, setTab] = useState('open');
   return (
     <>
-      <PageHeader title={t('bills.title')} sub={t('bills.sub')} />
+      {embedded ? null : <PageHeader title={t('bills.title')} sub={t('bills.sub')} />}
       <Tabs value={tab} onChange={setTab} items={[['open', t('bills.to_pay')], ['paid', t('bills.paid')], ['schedules', t('bills.recurring')]]} />
       <div style={{ marginTop: 12 }}>{tab === 'schedules' ? <Schedules /> : <Instances key={tab} status={tab} />}</div>
     </>

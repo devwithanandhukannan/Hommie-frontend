@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { afterAuthPath } from '@/lib/joinFlow';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { post, prefetchCsrf } from '@/lib/api';
@@ -8,7 +9,7 @@ import { AuthCard } from '@/components/AuthCard';
 import { Field, Input, Btn, ErrorNote, useToast } from '@/components/ui';
 
 export default function Register() {
-  const { signIn } = useAuth();
+  const { signIn, t } = useAuth();
   const router = useRouter();
   const toast = useToast();
 
@@ -48,7 +49,7 @@ export default function Register() {
     setError(null);
     try {
       const list = await signIn('/auth/register/verify-otp', { email: f.email, otp });
-      router.replace(list && list.length ? '/dashboard' : '/onboarding');
+      router.replace(afterAuthPath(list));
     } catch (err) {
       setError(err);
       setBusy(false);
@@ -72,11 +73,11 @@ export default function Register() {
   if (step === 'otp') {
     return (
       <AuthCard
-        title="Check your email"
-        sub={`We sent a 6-digit verification code to ${f.email}`}
+        title={t('auth.check_email')}
+        sub={`${t('auth.sent_to')} ${f.email}`}
       >
         <form className="col" onSubmit={handleVerifyOtp} style={{ gap: 16 }}>
-          <Field label="6-Digit Verification Code">
+          <Field label={t('auth.code_label')}>
             {(id) => (
               <Input
                 id={id}
@@ -104,7 +105,7 @@ export default function Register() {
           <ErrorNote error={error} />
 
           <Btn type="submit" disabled={busy || otp.length < 6}>
-            {busy ? 'Verifying…' : 'Verify & Continue'}
+            {busy ? t('auth.verifying') : t('auth.verify')}
           </Btn>
 
           <div className="row between" style={{ fontSize: 13, marginTop: 4 }}>
@@ -115,7 +116,7 @@ export default function Register() {
               onClick={handleResend}
               disabled={resending}
             >
-              {resending ? 'Sending…' : 'Resend code'}
+              {resending ? t('auth.sending') : t('auth.resend')}
             </button>
 
             <button
@@ -124,7 +125,7 @@ export default function Register() {
               style={{ color: 'var(--muted)', padding: '4px 8px' }}
               onClick={() => { setStep('details'); setOtp(''); setError(null); }}
             >
-              Change email
+              {t('auth.change_email')}
             </button>
           </div>
         </form>
@@ -133,9 +134,9 @@ export default function Register() {
   }
 
   return (
-    <AuthCard title="Create your account" sub="Then create a family or join one with a code">
+    <AuthCard title={t('auth.create_title')} sub={t('auth.create_sub')}>
       <form className="col" onSubmit={handleSendOtp} style={{ gap: 14 }}>
-        <Field label="Your name">
+        <Field label={t('auth.name')}>
           {(id) => (
             <Input
               id={id}
@@ -149,7 +150,7 @@ export default function Register() {
           )}
         </Field>
 
-        <Field label="Email">
+        <Field label={t('auth.email')}>
           {(id) => (
             <Input
               id={id}
@@ -163,7 +164,7 @@ export default function Register() {
           )}
         </Field>
 
-        <Field label="Password" hint="At least 10 characters">
+        <Field label={t('auth.password')} hint={t('auth.pw_hint')}>
           {(id) => (
             <Input
               id={id}
@@ -181,11 +182,11 @@ export default function Register() {
         <ErrorNote error={error} />
 
         <Btn type="submit" disabled={busy}>
-          {busy ? 'Sending verification code…' : 'Continue'}
+          {busy ? t('auth.sending_code') : t('auth.continue')}
         </Btn>
 
         <div className="small" style={{ textAlign: 'center', marginTop: 4 }}>
-          Already have an account? <Link href="/login" style={{ fontWeight: 600 }}>Sign in</Link>
+          {t('auth.have_account')} <Link href="/login" style={{ fontWeight: 600 }}>{t('auth.signin')}</Link>
         </div>
       </form>
     </AuthCard>

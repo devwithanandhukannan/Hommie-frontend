@@ -535,73 +535,73 @@ export default function AgenticChatPanel() {
         <div ref={scrollRef} />
       </div>
 
-      {/* Voice Recording Active Bar */}
-      {isRecording ? (
-        <div className="voice-record-bar" style={{ margin: '8px 12px 14px' }}>
-          <div className="voice-record-left">
-            <span className="record-dot" />
-            <span className="record-countdown">00:{seconds < 10 ? `0${seconds}` : seconds}</span>
-            <span className="small" style={{ marginLeft: 8 }}>
-              {lang === 'ml' ? 'കേൾക്കുന്നു...' : 'Listening...'}
-            </span>
+      {/* Voice Recording Active Bar or Bottom Input Composer */}
+      <div className="chat-composer-wrap">
+        {isRecording ? (
+          <div className="voice-record-bar">
+            <div className="voice-record-left">
+              <span className="record-dot" />
+              <span className="record-countdown">00:{seconds < 10 ? `0${seconds}` : seconds}</span>
+              <span className="small" style={{ marginLeft: 8 }}>
+                {lang === 'ml' ? 'കേൾക്കുന്നു...' : 'Listening...'}
+              </span>
+            </div>
+            <div className="voice-record-actions">
+              <button
+                type="button"
+                className="chat-pill-cancel-btn"
+                onClick={cancelVoice}
+                title="Cancel"
+              >
+                <Icon name="trash" size={17} />
+              </button>
+              <button
+                type="button"
+                className="chat-pill-action-btn"
+                onClick={stopAndSendVoice}
+                title="Send"
+              >
+                <Icon name="send" size={16} />
+              </button>
+            </div>
           </div>
-          <div className="voice-record-actions">
-            <button
-              type="button"
-              className="chat-pill-cancel-btn"
-              onClick={cancelVoice}
-              title="Cancel"
-            >
-              <Icon name="trash" size={17} />
-            </button>
-            <button
-              type="button"
-              className="chat-pill-action-btn"
-              onClick={stopAndSendVoice}
-              title="Send"
-            >
-              <Icon name="send" size={16} />
-            </button>
-          </div>
-        </div>
-      ) : (
-        /* Bottom Input Composer */
-        <form
-          className="chat-pill-bar"
-          style={{ margin: '8px 12px 14px' }}
-          onSubmit={(e) => {
-            e.preventDefault();
-            sendQuery(input);
-          }}
-        >
-          <input
-            className="chat-pill-input"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={lang === 'ml' ? 'ചോദിക്കാം (ഉദാ: എന്തൊക്കെ വാങ്ങാനുണ്ട്, ബിരിയാണി ഉണ്ടാക്കണം...)' : 'Ask Hommi AI (e.g. what to buy, make biriyani...)'}
-            maxLength={1000}
-          />
-          {input.trim() ? (
-            <button
-              type="submit"
-              className="chat-pill-action-btn"
-              disabled={busy}
-              title="Send query"
-            >
-              <Icon name="send" size={16} />
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="chat-pill-action-btn"
-              onClick={startVoice}
-              title="Speak to Hommi AI"
-            >
-              <Icon name="mic" size={17} />
-            </button>
-          )}
-        </form>
-      )}
+        ) : (
+          <form
+            className="chat-pill-bar"
+            onSubmit={(e) => {
+              e.preventDefault();
+              sendQuery(input);
+            }}
+          >
+            <input
+              className="chat-pill-input"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={lang === 'ml' ? 'ചോദിക്കാം (ഉദാ: എന്തൊക്കെ വാങ്ങാനുണ്ട്, ബിരിയാണി ഉണ്ടാക്കണം...)' : 'Ask Hommi AI (e.g. what to buy, make biriyani...)'}
+              maxLength={1000}
+            />
+            {input.trim() ? (
+              <button
+                type="submit"
+                className="chat-pill-action-btn"
+                disabled={busy}
+                title="Send query"
+              >
+                <Icon name="send" size={16} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="chat-pill-action-btn"
+                onClick={startVoice}
+                title="Speak to Hommi AI"
+              >
+                <Icon name="mic" size={17} />
+              </button>
+            )}
+          </form>
+        )}
+      </div>
     </div>
   );
 }

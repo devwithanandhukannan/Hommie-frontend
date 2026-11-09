@@ -5,15 +5,15 @@ import { useEffect, useState } from 'react';
 import { useAuth, useData } from '@/lib/auth';
 import { Icon, Sheet, Btn, Badge } from '@/components/ui';
 import { applyTheme, getSavedTheme } from '@/lib/theme';
-import PermissionsPrompt from '@/components/PermissionsPrompt';
 import PwaInstallPrompt from '@/components/PwaInstallPrompt';
-import QuickActionFab from '@/components/QuickActionFab';
+import AddSheet from '@/components/AddSheet';
 
+// Four places, always labelled. Everything you "add" goes through the single centre button.
 const MAIN_NAV = [
-  ['/dashboard', 'nav.today', 'home'],
-  ['/chat', 'nav.chat', 'chat'],
-  ['/planner', 'nav.planner', 'tasks'],
+  ['/dashboard', 'nav.today', 'sun'],
+  ['/planner', 'nav.home', 'home'],
   ['/money', 'nav.money', 'money'],
+  ['/chat', 'nav.chat', 'chat'],
 ];
 
 const MORE_NAV = [
@@ -24,13 +24,8 @@ const MORE_NAV = [
   ['/settings', 'nav.settings', 'settings'],
 ];
 
-const TABS = [
-  ['/dashboard', 'nav.today', 'home'],
-  ['/chat', 'nav.chat', 'chat'],
-  ['/planner', 'nav.planner', 'tasks'],
-  ['/money', 'nav.money', 'money'],
-  ['/more', 'nav.more', 'menu'],
-];
+const TABS_LEFT = MAIN_NAV.slice(0, 2);
+const TABS_RIGHT = MAIN_NAV.slice(2);
 
 function FamilySwitcher({ onClose }) {
   const { families, familyId, switchFamily, t } = useAuth();
@@ -75,6 +70,8 @@ export default function Shell({ children }) {
   const { family, families, familyId, t, user } = useAuth();
   const path = usePathname();
   const [open, setOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const router = useRouter();
   const notes = useData('/me/notifications', { interval: 60000 });
   const unread = notes.data?.unread || 0;
   const chatUnread = families.find((f) => f.id === familyId)?.unreadChat || 0;
@@ -92,6 +89,12 @@ export default function Shell({ children }) {
     }
     return (path === href || path.startsWith(`${href}/`)) ? 'page' : undefined;
   };
+
+  // Deep links: the app-icon shortcut and the join flow can open the add sheet directly (?add=1).
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('add') === '1') { setAddOpen(true); q.delete('add'); const rest = q.toString(); window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : '')); }
+  }, []);
 
   useEffect(() => {
     const saved = getSavedTheme();
@@ -127,11 +130,29 @@ export default function Shell({ children }) {
       <Icon name="swap" size={16} />
     </button>
   );
+  const profile = (
+    <Link href="/more" className="icon-btn avatar-btn" aria-label={t('nav.more')}>
+      <span>{(user?.name || 'U')[0].toUpperCase()}</span>
+    </Link>
+  );
   const bell = (
     <Link href="/notifications" className="icon-btn" aria-label={`Notifications${unread ? `, ${unread} new` : ''}`}>
       <Icon name="bell" />{unread ? <span className="count">{unread > 9 ? '9+' : unread}</span> : null}
     </Link>
   );
+
+  const renderTab = ([href, key, icon]) => {
+    const isCurrent = Boolean(isTabActive(href));
+    return (
+      <Link key={href} href={href} className={`tab ${isCurrent ? 'active' : ''}`} aria-current={isCurrent ? 'page' : undefined}>
+        <span className="tab-icon-wrap">
+          <Icon name={icon} size={22} />
+          {href === '/chat' && chatUnread ? <span className="tab-unread-dot" /> : null}
+        </span>
+        <span className="tab-label">{t(key)}</span>
+      </Link>
+    );
+  };
 
   return (
     <div className="shell">
@@ -142,6 +163,7 @@ export default function Shell({ children }) {
             {bell}
           </div>
         </div>
+        <button type="button" className="side-add" onClick={() => setAddOpen(true)}><Icon name="plus" size={18} />{t('nav.add')}</button>
         {MAIN_NAV.map(([href, key, icon]) => (
           <Link key={href} href={href} className="navlink" aria-current={isTabActive(href)}>
             <span className="row"><Icon name={icon} size={20} />{t(key)}</span>
@@ -200,35 +222,22 @@ export default function Shell({ children }) {
             {switcher}
             <div className="row" style={{ gap: 6 }}>
               {bell}
+              {profile}
             </div>
           </div>
           {children}
         </main>
         <nav className="tabbar mobile-only" aria-label="Main navigation">
-          {TABS.map(([href, key, icon]) => {
-            const isCurrent = Boolean(isTabActive(href));
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`tab ${isCurrent ? 'active' : ''}`}
-                aria-current={isCurrent ? 'page' : undefined}
-                aria-label={t(key)}
-              >
-                <span className="tab-icon-wrap">
-                  <Icon name={icon} size={isCurrent ? 18 : 20} />
-                  {href === '/chat' && chatUnread ? <span className="tab-unread-dot" /> : null}
-                </span>
-                {isCurrent ? <span className="tab-label">{t(key)}</span> : null}
-              </Link>
-            );
-          })}
+          {TABS_LEFT.map(renderTab)}
+          <button type="button" className="tab-add" onClick={() => setAddOpen(true)} aria-label={t('nav.add')}>
+            <Icon name="plus" size={26} />
+          </button>
+          {TABS_RIGHT.map(renderTab)}
         </nav>
       </div>
       {open ? <FamilySwitcher onClose={() => setOpen(false)} /> : null}
-      <PermissionsPrompt />
       <PwaInstallPrompt />
-      <QuickActionFab />
+      {addOpen ? <AddSheet onClose={() => setAddOpen(false)} /> : null}
     </div>
   );
 }
