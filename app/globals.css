@@ -3540,8 +3540,23 @@ html[data-theme='dark'] .dots i.on { background: var(--ok); }
 .saved-banner { border-radius: 20px; }
 .offline-screen { background: transparent; }
 
+.exp-row { width: 100%; border: 0; background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.exp-row:hover { opacity: 0.85; }
+.exp-cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.exp-cat { min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.exp-cat.on { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
+
+/* Calendar: clean single toolbar + honest aligned schedule */
+.cal-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.cal-view-switch { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.cal-view-switch button { min-height: 34px; padding: 0 14px; border-radius: 999px; border: 0; background: transparent; color: var(--muted); font-size: 13.5px; font-weight: 600; cursor: pointer; transition: background 0.15s ease, color 0.15s ease; }
+.cal-view-switch button[aria-selected='true'] { background: var(--brand); color: var(--on-brand); }
+.cal-filter-pill.active .cal-pill-count { background: color-mix(in srgb, var(--on-brand) 14%, transparent); color: var(--on-brand); }
+.cal-container { max-width: 720px; }
+.cal-container.is-month { max-width: 1080px; }
+
 @media (min-width: 900px) {
-  .trows, .goal, .wk-strip, .wk-head, .mini-lines, .tline, .pcards { max-width: 720px; }
+  .trows, .goal, .wk-strip, .wk-head, .mini-lines, .tline, .pcards, .money-page { max-width: 720px; }
 }
 
 /* ===== Landing: very little text, a lot of air ===== */

@@ -471,8 +471,8 @@ function AmountSheet({ inst, onClose, onDone }) {
   );
 }
 
-export default function CalendarPage() {
-  const { family } = useAuth();
+export default function CalendarPage({ embedded = false }) {
+  const { family, lang } = useAuth();
   const today = todayStr(family?.timezone);
   const [curMonth, setCurMonth] = useState(today.slice(0, 7));
   const [selectedDate, setSelectedDate] = useState(today);
@@ -485,7 +485,8 @@ export default function CalendarPage() {
 
   const [year, monthNum] = curMonth.split('-').map(Number);
   const monthDate = new Date(Date.UTC(year, monthNum - 1, 1));
-  const monthTitle = monthDate.toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const locale = lang === 'ml' ? 'ml-IN' : lang === 'ta' ? 'ta-IN' : lang === 'hi' ? 'hi-IN' : 'en-IN';
+  const monthTitle = monthDate.toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
   const goMonth = (delta) => {
     const d = new Date(Date.UTC(year, monthNum - 1 + delta, 1));
@@ -537,18 +538,26 @@ export default function CalendarPage() {
   }, [year, monthNum]);
 
   const byDate = data?.byDate || {};
+  const thisYm = today.slice(0, 7);
+  const scheduleDates = useMemo(
+    () => Object.keys(byDate).sort().filter((d) => d >= today || !d.startsWith(thisYm)),
+    [byDate, today, thisYm]
+  );
 
+  // Match counts strictly to the dates visible in the active mode (and keep daily medicine doses out of Calendar)
   const filterCounts = useMemo(() => {
-    const counts = { all: 0, meal: 0, task: 0, bill: 0, special_day: 0, medicine: 0, other: 0 };
-    for (const d in byDate) {
-      for (const ev of byDate[d]) {
-        if (ev.type !== 'medicine') counts.all++;
+    const counts = { all: 0, meal: 0, task: 0, bill: 0, special_day: 0, other: 0 };
+    const dates = viewMode === 'list' ? scheduleDates : Object.keys(byDate);
+    for (const d of dates) {
+      for (const ev of byDate[d] || []) {
+        if (ev.type === 'medicine') continue;
+        counts.all++;
         if (counts[ev.type] !== undefined) counts[ev.type]++;
         else counts.other++;
       }
     }
     return counts;
-  }, [byDate]);
+  }, [byDate, scheduleDates, viewMode]);
 
   const selectedEvents = useMemo(() => {
     const list = byDate[selectedDate] || [];
@@ -557,60 +566,65 @@ export default function CalendarPage() {
     return list.filter((e) => e.type === filter);
   }, [byDate, selectedDate, filter]);
 
+  const scheduleGroups = useMemo(() => (
+    scheduleDates
+      .map((d) => ({
+        date: d,
+        events: (byDate[d] || []).filter((e) => (filter === 'all' ? e.type !== 'medicine' : e.type === filter)),
+      }))
+      .filter((g) => g.events.length > 0)
+  ), [scheduleDates, byDate, filter]);
+
   const completeTask = (task) => run(async () => {
     await post(`/tasks/${task.id}/complete`, {});
     reload();
   }, 'Task completed');
 
-  const recordMedicine = (m) => run(async () => {
-    await post(`/medicines/${m.meta.medicineId}/logs`, { time: m.meta.time, status: 'given' });
-    reload();
-  }, 'Dose recorded');
+  const awayFromToday = curMonth !== thisYm || (viewMode === 'month' && selectedDate !== today);
 
   return (
-    <div className="cal-container">
-      {/* Page Header with Month Navigation */}
-      <PageHeader title="Calendar" sub={family?.name}>
-        <div className="row wrap" style={{ gap: 8, alignItems: 'center' }}>
-          <div className="row" style={{ background: 'var(--surface)', padding: '3px 8px', borderRadius: 999, border: '1px solid var(--line)' }}>
-            <button type="button" className="icon-btn" style={{ width: 30, height: 30, border: 0 }} aria-label="Previous month" onClick={() => goMonth(-1)}>
-              ‹
-            </button>
-            <span style={{ fontWeight: 700, padding: '0 8px', minWidth: 130, textAlign: 'center', fontSize: 14 }}>
-              {monthTitle}
-            </span>
-            <button type="button" className="icon-btn" style={{ width: 30, height: 30, border: 0 }} aria-label="Next month" onClick={() => goMonth(1)}>
-              ›
-            </button>
-          </div>
-          <Btn tone="ghost" size="sm" onClick={goToday}>Today</Btn>
-          <div className="tabs" style={{ padding: 2 }}>
-            <button type="button" aria-selected={viewMode === 'month'} onClick={() => setViewMode('month')}>Month</button>
-            <button type="button" aria-selected={viewMode === 'list'} onClick={() => setViewMode('list')}>Schedule</button>
-          </div>
-        </div>
-      </PageHeader>
+    <div className={`cal-container ${viewMode === 'month' ? 'is-month' : ''}`}>
+      {!embedded ? <PageHeader title="Calendar" sub={family?.name} /> : null}
 
-      {/* Filter Tabs */}
-      <div className="cal-filter-bar" role="tablist" aria-label="Filter calendar events">
-        {[
-          ['all', 'All', filterCounts.all],
-          ['task', 'Tasks', filterCounts.task],
-          ['bill', 'Bills', filterCounts.bill],
-          ['meal', 'Meals', filterCounts.meal],
-          ['special_day', 'Events', filterCounts.special_day],
-          ['medicine', 'Medicine', filterCounts.medicine],
-        ].map(([key, label, count]) => (
-          <button
-            key={key}
-            type="button"
-            className={`cal-filter-pill ${filter === key ? 'active' : ''}`}
-            onClick={() => setFilter(key)}
-          >
-            {label} <span className="cal-pill-count">{count}</span>
-          </button>
-        ))}
+      {/* Clean single-row toolbar */}
+      <div className="cal-toolbar">
+        <div className="row" style={{ gap: 8 }}>
+          <Btn size="sm" tone="ghost" aria-label="Previous month" onClick={() => goMonth(-1)}>‹</Btn>
+          <b>{monthTitle}</b>
+          <Btn size="sm" tone="ghost" aria-label="Next month" onClick={() => goMonth(1)}>›</Btn>
+          {awayFromToday ? <Btn tone="ghost" size="sm" onClick={goToday}>Today</Btn> : null}
+        </div>
+        <div className="cal-view-switch" role="tablist" aria-label="Calendar view">
+          <button type="button" role="tab" aria-selected={viewMode === 'list'} onClick={() => setViewMode('list')}>Schedule</button>
+          <button type="button" role="tab" aria-selected={viewMode === 'month'} onClick={() => setViewMode('month')}>Month</button>
+        </div>
       </div>
+
+      {/* Honest filter pills (only show categories present or currently selected) */}
+      {filterCounts.all > 0 || filter !== 'all' ? (
+        <div className="cal-filter-bar" role="tablist" aria-label="Filter calendar events">
+          {[
+            ['all', 'All', filterCounts.all],
+            ['task', 'Tasks', filterCounts.task],
+            ['bill', 'Bills', filterCounts.bill],
+            ['meal', 'Meals', filterCounts.meal],
+            ['special_day', 'Events', filterCounts.special_day],
+          ]
+            .filter(([key, , count]) => key === 'all' || count > 0 || filter === key)
+            .map(([key, label, count]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={filter === key}
+                className={`cal-filter-pill ${filter === key ? 'active' : ''}`}
+                onClick={() => setFilter(key)}
+              >
+                {label} <span className="cal-pill-count">{count}</span>
+              </button>
+            ))}
+        </div>
+      ) : null}
 
       {loading && !data ? <Spinner /> : error ? <ErrorNote error={error} /> : (
         <>
@@ -779,39 +793,44 @@ export default function CalendarPage() {
               </div>
             </div>
           ) : (
-            /* Schedule List View */
-            <div className="card col" style={{ maxWidth: 800, margin: '0 auto', borderRadius: 24, padding: 20 }}>
-              <h2 style={{ fontSize: 18, marginBottom: 12 }}>{monthTitle} Schedule</h2>
-              {Object.keys(byDate).sort().length === 0 ? (
-                <Empty>No events scheduled for {monthTitle}.</Empty>
-              ) : (
-                Object.keys(byDate).sort().filter((d) => d >= today || !d.startsWith(today.slice(0, 7))).map((d) => { // this month: only what is still ahead
-                  const evs = byDate[d].filter((e) => (filter === 'all' ? e.type !== 'medicine' : e.type === filter));
-                  if (evs.length === 0) return null;
+            /* Clean Schedule List View */
+            scheduleGroups.length === 0 ? (
+              <Empty>Nothing coming up in {monthTitle}.</Empty>
+            ) : (
+              <div className="col" style={{ gap: 18 }}>
+                {scheduleGroups.map(({ date: d, events: evs }) => {
+                  const weekday = new Date(`${d}T00:00:00Z`).toLocaleDateString(locale, { weekday: 'short', timeZone: 'UTC' });
                   return (
-                    <div key={d} style={{ marginBottom: 18 }}>
-                      <div className="row" style={{ gap: 8, marginBottom: 6 }}>
-                        <span className="bold" style={{ fontSize: 15 }}>{shortDate(d)}</span>
-                        <span className="tiny muted">{longDate(d)}</span>
-                        {d === today && <Badge tone="info">Today</Badge>}
+                    <section key={d}>
+                      <div className="today-group" style={{ margin: '4px 4px 8px' }}>
+                        {d === today ? `Today · ${shortDate(d, lang)}` : `${shortDate(d, lang)} · ${weekday}`}
                       </div>
-                      <div className="card list" style={{ padding: '4px 12px' }}>
-                        {evs.map((ev) => (
-                          <div key={ev.id} className="item" style={{ padding: '10px 0' }}>
-                            <EventBadge event={ev} size={28} showDot={false} />
-                            <div className="grow">
-                              <div className="bold">{ev.title}</div>
-                              <div className="small muted">{ev.subtitle || ev.type}</div>
-                            </div>
-                            {ev.link && <Link href={ev.link} className="btn ghost sm">Open ›</Link>}
-                          </div>
-                        ))}
+                      <div className="card list">
+                        {evs.map((ev) => {
+                          const row = (
+                            <>
+                              <EventBadge event={ev} size={28} showDot={false} />
+                              <div className="grow" style={{ minWidth: 0 }}>
+                                <div className="bold">{ev.title}</div>
+                                <div className="small muted">
+                                  {[ev.subtitle, ev.person?.displayName].filter(Boolean).join(' · ') || ev.type}
+                                </div>
+                              </div>
+                              {ev.link ? <span className="muted" aria-hidden="true">›</span> : null}
+                            </>
+                          );
+                          return ev.link ? (
+                            <Link key={ev.id} href={ev.link} className="item exp-row" style={{ textDecoration: 'none' }}>{row}</Link>
+                          ) : (
+                            <div key={ev.id} className="item">{row}</div>
+                          );
+                        })}
                       </div>
-                    </div>
+                    </section>
                   );
-                })
-              )}
-            </div>
+                })}
+              </div>
+            )
           )}
         </>
       )}

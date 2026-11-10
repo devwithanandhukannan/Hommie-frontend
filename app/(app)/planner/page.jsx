@@ -33,7 +33,7 @@ function PlannerContent() {
         {tab === 'tasks' ? <TasksPage /> : null}
         {tab === 'grocery' ? <GroceryPage /> : null}
         {tab === 'meals' ? <MealsPage /> : null}
-        {tab === 'calendar' ? <CalendarPage /> : null}
+        {tab === 'calendar' ? <CalendarPage embedded /> : null}
       </div>
     </div>
   );
