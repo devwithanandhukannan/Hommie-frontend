@@ -25,7 +25,7 @@ export default function Landing() {
   return (
     <div className="lp">
       <header className="lp-nav">
-        <span className="lp-mark"><img src="/icon.svg?v=2" alt="" width="26" height="26" />hommi</span>
+        <span className="lp-mark"><img src="/icon.svg?v=2" alt="" width="26" height="26" />Hommi</span>
         <nav className="lp-nav-r" aria-label="Language and sign in">
           <span className="lp-langs" role="group" aria-label="Language">
             {LANGS.map(([c, label]) => <button key={c} type="button" className={c === lang ? 'on' : ''} aria-pressed={c === lang} onClick={() => setLang(c)}>{label}</button>)}
@@ -72,7 +72,7 @@ export default function Landing() {
         </section>
       </main>
 
-      <footer className="lp-foot">hommi · {t('land.private')}</footer>
+      <footer className="lp-foot">Hommi · {t('land.private')}</footer>
     </div>
   );
 }

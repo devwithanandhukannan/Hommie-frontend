@@ -25,9 +25,10 @@ export const metadata = {
 };
 // viewportFit "cover" lets the app use the full screen on notched phones; the CSS adds the safe-area padding.
 export const viewport = {
+  colorScheme: 'light dark',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#F6F5F1' },
-    { media: '(prefers-color-scheme: dark)', color: '#0B0F0E' },
+    { media: '(prefers-color-scheme: light)', color: '#F5F5F7' },
+    { media: '(prefers-color-scheme: dark)', color: '#000000' },
   ],
   width: 'device-width',
   initialScale: 1,

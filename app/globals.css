@@ -3773,17 +3773,17 @@ html[data-theme='dark'] .dots i.on { background: var(--ok); }
 .lp-nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; max-width: 1200px; margin: 0 auto; }
 .lp-mark { display: inline-flex; align-items: center; gap: 8px; font-size: 22px; font-weight: 300; letter-spacing: -0.03em; }
 .lp-nav-r { display: flex; align-items: center; gap: 14px; }
-.lp-langs { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(255, 255, 255, 0.65); }
+.lp-langs { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
 .lp-langs button { min-width: 34px; min-height: 32px; padding: 0 8px; border: 0; border-radius: 999px; background: none; color: var(--muted); font-size: 13px; cursor: pointer; }
 .lp-langs button.on { background: var(--brand); color: var(--on-brand); }
 .lp-link { color: var(--text); font-weight: 600; font-size: 15px; text-decoration: none; padding: 8px 4px; }
 .lp-hero { position: relative; min-height: min(86dvh, 760px); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 22px 120px; }
 .lp-title { position: relative; z-index: 1; margin: 0; font-size: clamp(42px, 9.5vw, 92px); line-height: 1.02; font-weight: 300; letter-spacing: -0.045em; white-space: pre-line; }
-.lp-sub { position: relative; z-index: 1; margin: 22px 0 0; max-width: 30ch; color: var(--muted); font-size: 17px; line-height: 1.5; }
+.lp-sub { position: relative; z-index: 1; margin: 22px 0 0; max-width: 32ch; color: var(--muted); font-size: 17px; line-height: 1.5; }
 .lp-cta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 30px; }
 .lp-btn { min-height: 54px; padding: 0 30px; font-size: 16px; text-decoration: none; }
 .lp-bars { position: absolute; left: 0; right: 0; bottom: 0; height: 34%; display: flex; align-items: flex-end; pointer-events: none; }
-.lp-bars i { flex: 1; border: 1px solid rgba(20, 20, 25, 0.1); border-bottom: 0; background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent); }
+.lp-bars i { flex: 1; border: 1px solid var(--line); border-bottom: 0; background: linear-gradient(180deg, rgba(255, 255, 255, 0.45), transparent); opacity: 0.7; }
 .lp-glimpse { display: flex; justify-content: center; padding: 0 22px; margin-top: -70px; position: relative; z-index: 2; }
 .lp-device { width: min(340px, 100%); padding: 18px; border-radius: 44px; background: var(--surface); box-shadow: 0 30px 80px rgba(20, 20, 25, 0.14); display: flex; flex-direction: column; gap: 12px; }
 .lp-wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
@@ -3793,12 +3793,12 @@ html[data-theme='dark'] .dots i.on { background: var(--ok); }
 .lp-goal b { font-size: 56px; font-weight: 300; letter-spacing: -0.05em; line-height: 1; }
 .lp-goal b small { font-size: 0.4em; color: var(--muted); }
 .lp-goal .dots { grid-template-columns: repeat(5, 16px); gap: 6px; padding: 0; }
-.lp-goal .dots i { width: 16px; height: 16px; background: #DADADD; }
+.lp-goal .dots i { width: 16px; height: 16px; background: var(--line); }
 .lp-goal .dots i.on { background: var(--ok); }
 .lp-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 24px; background: var(--surface-2); }
 .lp-row span { display: flex; flex-direction: column; gap: 8px; flex: 1; }
-.lp-row i { display: block; height: 12px; border-radius: 6px; background: #D5D5D9; }
-.lp-row i.s { height: 8px; background: #E3E3E6; }
+.lp-row i { display: block; height: 12px; border-radius: 6px; background: var(--line); }
+.lp-row i.s { height: 8px; opacity: 0.65; }
 .lp-row em { width: 46px; height: 46px; border-radius: 50%; background: var(--brand); }
 .lp-dark { margin-top: 90px; padding: 70px 22px 80px; background: #1A1B1E; border-radius: 40px; margin-left: 10px; margin-right: 10px; }
 .lp-cards { display: grid; gap: 14px; max-width: 1100px; margin: 0 auto; grid-template-columns: 1fr; }
@@ -3811,7 +3811,8 @@ html[data-theme='dark'] .dots i.on { background: var(--ok); }
 .lp-final h2 { margin: 0; font-size: clamp(38px, 8vw, 72px); font-weight: 300; letter-spacing: -0.045em; }
 .lp-foot { padding: 0 22px 36px; text-align: center; color: var(--muted); font: 500 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.06em; }
 @media (min-width: 820px) { .lp-cards { grid-template-columns: repeat(3, 1fr); } .lp-card { min-height: 300px; } .lp-nav { padding: 24px 36px; } }
-@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .lp-langs { background: rgba(255, 255, 255, 0.06); } :root:not([data-theme='light']) .lp-bars i { border-color: rgba(255, 255, 255, 0.1); background: none; } :root:not([data-theme='light']) .lp-goal .dots i { background: #3A3C42; } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .lp-bars i { background: none; } }
+html[data-theme='dark'] .lp-bars i { background: none; }
 
 /* ==========================================================================
    Peaceful Chat Theme: Monochrome Black & White (Matches Calm Reference)
