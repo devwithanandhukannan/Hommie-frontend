@@ -1,22 +1,14 @@
 'use client';
+import Link from 'next/link';
 import { useState } from 'react';
 import { useAuth, notifyChanged } from '@/lib/auth';
 import { post } from '@/lib/api';
-import { Sheet, Btn, Input, Select, MemberSelect, Icon, UnitButtons, formatQty, useAction, useToast } from '@/components/ui';
+import { Sheet, Btn, Input, Select, MemberSelect, Icon, useAction, useToast } from '@/components/ui';
 import { todayStr, toPaise } from '@/lib/format';
 import AiAssistantModal from './AiAssistantModal';
 
 const ECATS = ['grocery', 'food', 'bills', 'rent', 'tax', 'emi', 'medical', 'transport', 'shopping', 'education', 'entertainment', 'household', 'other'];
 const splitList = (v) => v.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean);
-
-function Tile({ icon, label, sub, onClick, primary }) {
-  return (
-    <button type="button" className={`add-tile ${primary ? 'primary' : ''}`} onClick={onClick}>
-      <span className="add-tile-icon"><Icon name={icon} size={primary ? 24 : 22} /></span>
-      <span className="add-tile-text"><span className="add-tile-label">{label}</span>{sub ? <span className="add-tile-sub">{sub}</span> : null}</span>
-    </button>
-  );
-}
 
 /** One place to add anything. Every form asks for the one thing that matters and hides the rest. */
 export default function AddSheet({ onClose, start = 'menu' }) {
@@ -27,7 +19,6 @@ export default function AddSheet({ onClose, start = 'menu' }) {
   const [more, setMore] = useState(false);
   const [text, setText] = useState('');
   const [qty, setQty] = useState('');
-  const [unit, setUnit] = useState('pcs');
   const [assignee, setAssignee] = useState(null);
   const [due, setDue] = useState('');
   const [amount, setAmount] = useState('');
@@ -41,9 +32,8 @@ export default function AddSheet({ onClose, start = 'menu' }) {
     e.preventDefault();
     const items = splitList(text);
     if (!items.length) return;
-    const finalQty = formatQty(qty, unit);
     // Exactly what the server accepts: { name, qty? }. (The old button also sent "status", which was always rejected.)
-    if (await run(async () => { for (const name of items) await post('/grocery', items.length === 1 && finalQty ? { name, qty: finalQty } : { name }); })) done(`${items.length} ✓`);
+    if (await run(async () => { for (const name of items) await post('/grocery', items.length === 1 && qty.trim() ? { name, qty: qty.trim() } : { name }); })) done(`${items.length} ✓`);
   };
   const saveTask = async (e) => {
     e.preventDefault();
@@ -64,13 +54,16 @@ export default function AddSheet({ onClose, start = 'menu' }) {
   return (
     <Sheet title={mode === 'menu' ? t('add.title') : t(`add.${mode}`)} onClose={onClose}>
       {mode === 'menu' ? (
-        <div className="col" style={{ gap: 10 }}>
-          <Tile primary icon="sparkles" label={t('add.talk')} sub={t('add.talk_sub')} onClick={() => setMode('ai')} />
-          <div className="add-grid">
-            <Tile icon="cart" label={t('add.grocery')} onClick={() => setMode('grocery')} />
-            <Tile icon="tasks" label={t('add.task')} onClick={() => setMode('task')} />
-            <Tile icon="money" label={t('add.expense')} onClick={() => setMode('expense')} />
+        <div className="menu-card">
+          <div className="menu-icons">
+            <button type="button" className="menu-icon" onClick={() => setMode('grocery')}><span><Icon name="cart" size={24} /></span>{t('add.grocery')}</button>
+            <button type="button" className="menu-icon" onClick={() => setMode('task')}><span><Icon name="tasks" size={24} /></span>{t('add.task')}</button>
+            <button type="button" className="menu-icon" onClick={() => setMode('expense')}><span><Icon name="money" size={24} /></span>{t('add.expense')}</button>
           </div>
+          <button type="button" className="menu-row" onClick={() => setMode('ai')}><span>{t('add.talk')}</span><span className="accent"><Icon name="sparkles" size={22} /></span></button>
+          <Link href="/family" className="menu-row" onClick={onClose}><span>{t('menu.invite')}</span><Icon name="family" size={22} /></Link>
+          <Link href="/special-days" className="menu-row" onClick={onClose}><span>{t('nav.days')}</span><Icon name="days" size={22} /></Link>
+          <Link href="/medicine" className="menu-row" onClick={onClose}><span>{t('nav.medicine')}</span><Icon name="med" size={22} /></Link>
         </div>
       ) : null}
 
@@ -78,12 +71,7 @@ export default function AddSheet({ onClose, start = 'menu' }) {
         <form className="col" onSubmit={saveGrocery}>
           {back}
           <Input autoFocus required aria-label={t('add.grocery')} placeholder={t('add.grocery_ph')} value={text} onChange={(e) => setText(e.target.value)} maxLength={400} />
-          {more ? (
-            <div className="col" style={{ gap: 8 }}>
-              <Input aria-label="Qty" placeholder="Quantity (e.g. 500, 2, 1.5)" value={qty} onChange={(e) => setQty(e.target.value)} maxLength={30} />
-              <UnitButtons selected={unit} onSelect={setUnit} />
-            </div>
-          ) : null}
+          {more ? <Input aria-label="Qty" placeholder="1 L, 500 g…" value={qty} onChange={(e) => setQty(e.target.value)} maxLength={30} /> : null}
           <Btn type="submit" disabled={busy || !text.trim()}>{t('btn.add')}</Btn>
           {!more ? <button type="button" className="link-btn" onClick={() => setMore(true)}>{t('add.more')}</button> : null}
         </form>

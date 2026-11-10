@@ -1,87 +1,39 @@
 'use client';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { Icon, PageHeader } from '@/components/ui';
+import { Icon } from '@/components/ui';
+
+function Row({ href, icon, title, sub, onClick }) {
+  const inner = (
+    <>
+      <span className="moment-icon"><Icon name={icon} size={22} /></span>
+      <span className="grow"><span style={{ display: 'block' }}>{title}</span>{sub ? <span className="small muted" style={{ display: 'block', fontWeight: 400 }}>{sub}</span> : null}</span>
+      <span className="acc-btn" aria-hidden="true">›</span>
+    </>
+  );
+  return (
+    <div className="acc-item">
+      {href ? <Link href={href} className="acc-head" style={{ textDecoration: 'none' }}>{inner}</Link> : <button type="button" className="acc-head" onClick={onClick}>{inner}</button>}
+    </div>
+  );
+}
 
 export default function More() {
-  const { signOut, t, lang, user, family } = useAuth();
-
-  const familyItems = [
-    ['/medicine', t('nav.medicine'), t('more.sub_med') || 'Medicine schedules and reminders', 'med'],
-    ['/documents', t('nav.documents'), t('more.sub_docs') || 'Encrypted family vault', 'docs'],
-    ['/special-days', t('nav.days'), t('more.sub_days') || 'Birthdays and anniversaries', 'days'],
-    ['/family', t('nav.family'), t('more.sub_family') || 'Members and permissions', 'family'],
-  ];
-
-  const quickPillars = [
-    ['/planner', t('nav.planner') || 'Planner', 'Tasks, groceries, meals, and calendar', 'tasks'],
-    ['/money', t('nav.money') || 'Money & Bills', 'Expenses, bills, loans, and wallet', 'money'],
-  ];
-
-  const systemItems = [
-    ['/settings', t('nav.settings'), t('more.sub_settings') || 'Language, theme, notifications', 'settings'],
-  ];
-
+  const { signOut, t, user, family } = useAuth();
+  const router = useRouter();
   return (
-    <>
-      <PageHeader
-        title={lang === 'ml' ? 'കൂടുതൽ കാര്യങ്ങൾ' : t('more.title')}
-        sub={`${family?.name || 'Family'} · ${user?.name || 'Account'}`}
-      />
-
-      <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--muted)', margin: '16px 0 8px 4px', letterSpacing: '0.04em' }}>
-        {lang === 'ml' ? 'പ്രധാന വിഭാഗങ്ങൾ' : 'Main Pillars'}
+    <div>
+      <h1 className="today-hello">{t('more.title')}</h1>
+      <p className="today-sentence">{family?.name} · {user?.name}</p>
+      <div className="acc">
+        <Row href="/medicine" icon="med" title={t('nav.medicine')} sub={t('more.sub_med')} />
+        <Row href="/documents" icon="docs" title={t('nav.documents')} sub={t('more.sub_docs')} />
+        <Row href="/special-days" icon="days" title={t('nav.days')} sub={t('more.sub_days')} />
+        <Row href="/family" icon="family" title={t('nav.family')} sub={t('more.sub_family')} />
+        <Row href="/settings" icon="settings" title={t('nav.settings')} sub={t('more.sub_settings')} />
+        <Row icon="back" title={t('btn.signout')} onClick={async () => { await signOut(); router.replace('/'); }} />
       </div>
-      <div className="card list">
-        {quickPillars.map(([href, label, sub, icon]) => (
-          <Link key={href} href={href} className="item" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <Icon name={icon} />
-            <div className="grow">
-              <div className="bold">{label}</div>
-              <div className="small muted">{sub}</div>
-            </div>
-            <span aria-hidden="true">›</span>
-          </Link>
-        ))}
-      </div>
-
-      <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--muted)', margin: '20px 0 8px 4px', letterSpacing: '0.04em' }}>
-        {lang === 'ml' ? 'ആരോഗ്യവും രേഖകളും' : 'Health & Records'}
-      </div>
-      <div className="card list">
-        {familyItems.map(([href, label, sub, icon]) => (
-          <Link key={href} href={href} className="item" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <Icon name={icon} />
-            <div className="grow">
-              <div className="bold">{label}</div>
-              <div className="small muted">{sub}</div>
-            </div>
-            <span aria-hidden="true">›</span>
-          </Link>
-        ))}
-      </div>
-
-      <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--muted)', margin: '20px 0 8px 4px', letterSpacing: '0.04em' }}>
-        {lang === 'ml' ? 'ക്രമീകരണങ്ങൾ' : 'Preferences'}
-      </div>
-      <div className="card list">
-        {systemItems.map(([href, label, sub, icon]) => (
-          <Link key={href} href={href} className="item" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <Icon name={icon} />
-            <div className="grow">
-              <div className="bold">{label}</div>
-              <div className="small muted">{sub}</div>
-            </div>
-            <span aria-hidden="true">›</span>
-          </Link>
-        ))}
-      </div>
-
-      <div style={{ marginTop: 24 }}>
-        <button type="button" className="btn ghost" onClick={signOut}>
-          {t('btn.signout')}
-        </button>
-      </div>
-    </>
+    </div>
   );
 }

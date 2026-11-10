@@ -1,14 +1,17 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { post } from '@/lib/api';
 import { useAuth, useData, notifyChanged } from '@/lib/auth';
-import { Icon, Input, Field, Btn, Sheet, Spinner, ErrorNote, useAction } from '@/components/ui';
+import { Icon, Btn, Sheet, Spinner, ErrorNote, useAction } from '@/components/ui';
 import { rupees, toPaise, shortDate, todayStr } from '@/lib/format';
 import { requestNotifications } from '@/lib/permissions';
 
-const hhmmNow = () => { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+const LOCALES = { en: 'en-IN', hi: 'hi-IN', ta: 'ta-IN', ml: 'ml-IN' };
 const minutes = (hhmm) => { const [h, m] = String(hhmm).split(':').map(Number); return h * 60 + (m || 0); };
+const hhmmNow = () => { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+const shift = (s, n) => { const d = new Date(`${s}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const fmt = (s, lang, opts) => new Date(`${s}T00:00:00Z`).toLocaleDateString(LOCALES[lang] || 'en-IN', { timeZone: 'UTC', ...opts });
 
 function AmountSheet({ inst, onClose }) {
   const { t } = useAuth();
@@ -30,20 +33,16 @@ function AmountSheet({ inst, onClose }) {
   );
 }
 
-/** One row of the stream: a title, a quiet subtitle and at most one primary action. */
-function Moment({ icon, title, sub, urgent, href, action, second, check }) {
-  const body = (
-    <>
-      <span className="moment-icon"><Icon name={icon} size={20} /></span>
-      <span className="moment-body"><div className="moment-title">{title}</div>{sub ? <div className="moment-sub">{sub}</div> : null}</span>
-    </>
-  );
+/** A row: small tags, a light title, one big round action. */
+function TaskRow({ chips = [], title, action, link, done }) {
   return (
-    <div className={`moment ${urgent ? 'urgent' : ''}`}>
-      {check ? <button type="button" className="moment-check" aria-label={check.label} onClick={check.onClick}><Icon name="check" size={18} /></button> : null}
-      {href ? <Link href={href} style={{ display: 'contents', color: 'inherit', textDecoration: 'none' }}>{body}</Link> : body}
-      {second ? <button type="button" className="moment-act ghost" onClick={second.onClick}>{second.label}</button> : null}
-      {action ? <button type="button" className="moment-act" onClick={action.onClick}>{action.label}</button> : null}
+    <div className={`trow ${done ? 'is-done' : ''}`}>
+      <div className="trow-main">
+        {chips.length ? <div className="trow-chips">{chips.map((c, i) => <span key={i} className={`chip ${c.tone || ''}`}>{c.label}</span>)}</div> : null}
+        <div className="trow-title">{title}</div>
+        {link ? <button type="button" className="trow-link" onClick={link.onClick}>{link.label}</button> : null}
+      </div>
+      {done ? <span className="round-act ok" aria-hidden="true"><Icon name="check" size={26} /></span> : action ? <button type="button" className="round-act" onClick={action.onClick}>{action.label}</button> : null}
     </div>
   );
 }
@@ -53,8 +52,7 @@ function NotificationAsk({ t }) {
   useEffect(() => {
     try {
       if (!('Notification' in window) || Notification.permission !== 'default') return;
-      const at = Number(localStorage.getItem('fh_notif_ask_at') || 0);
-      if (Date.now() - at > 7 * 864e5) setShow(true);
+      if (Date.now() - Number(localStorage.getItem('fh_notif_ask_at') || 0) > 7 * 864e5) setShow(true);
     } catch { /* storage unavailable: just don't ask */ }
   }, []);
   if (!show) return null;
@@ -69,128 +67,175 @@ function NotificationAsk({ t }) {
   );
 }
 
+function DayTimeline({ day, today, t }) {
+  const { data, loading } = useData(`/calendar?from=${day}&to=${day}`);
+  if (loading && !data) return <Spinner />;
+  const timeOf = (e) => { const m = /(\d{1,2}:\d{2})/.exec(`${e.title} ${e.subtitle || ''}`); return m ? m[1].padStart(5, '0') : null; };
+  const slot = { Breakfast: '08:00', Lunch: '13:00', Dinner: '20:00' };
+  const events = (data?.byDate?.[day] || []).map((e) => ({ ...e, time: timeOf(e) || (e.type === 'meal' ? slot[e.subtitle] : null) }))
+    .sort((a, b) => String(a.time || '00:00').localeCompare(String(b.time || '00:00')));
+  if (!events.length) return <p className="today-sentence" style={{ marginTop: 22 }}>{t('day.empty')}</p>;
+  return (
+    <div className="tline">
+      {events.map((e, i) => (
+        <div key={`${e.type}-${e.id}-${i}`} className={`tl-item ${i === 0 && day > today ? 'next' : ''}`}>
+          <div className="tl-row"><span className="tl-title">{e.title.replace(/\s*\(\d{1,2}:\d{2}\)/, '')}</span>{e.time ? <span className="tl-time">{e.time}</span> : null}</div>
+          {(() => { const sub = [(e.subtitle || '').replace(/\s*·?\s*\d{1,2}:\d{2}/, '').replace(/^\s*·\s*/, '').trim(), e.person?.displayName].filter(Boolean).join(' · '); return sub ? <div className="tl-sub">{sub}</div> : null; })()}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Today() {
-  const { t, family, user } = useAuth();
+  const { t, family, user, lang } = useAuth();
   const { data: d, error, loading, reload } = useData('/dashboard', { interval: 60000 });
+  const { data: doneTasks } = useData('/tasks?scope=done', { interval: 60000 });
   const [run] = useAction();
   const [amountFor, setAmountFor] = useState(null);
   const [expanded, setExpanded] = useState(false);
+  const tz = family?.timezone || undefined;
+  const today = todayStr(tz);
+  const [sel, setSel] = useState(null);
+  const [anchor, setAnchor] = useState(null);
+  const day = sel || today;
+  const mid = anchor || today;
+  const days = useMemo(() => [-3, -2, -1, 0, 1, 2, 3].map((n) => shift(mid, n)), [mid]);
+
   if (loading && !d) return <Spinner />;
   if (error && !d) return <ErrorNote error={error} />;
 
   const me = family?.myMembershipId;
-  const today = todayStr(family?.timezone || undefined);
   const nowMin = minutes(hhmmNow());
   const hour = new Date().getHours();
   const greet = hour < 12 ? t('greet.morning') : hour < 17 ? t('greet.afternoon') : t('greet.evening');
   const first = (user?.name || '').split(' ')[0];
-
   const act = (fn) => run(async () => { await fn(); notifyChanged(); reload(); });
-  const complete = (task) => act(() => post(`/tasks/${task.id}/complete`, {}));
-  const logDose = (m, status) => act(() => post(`/medicines/${m.medicineId}/logs`, { time: m.time, status }));
-  const payBill = (i) => act(() => post(`/bill-instances/${i.id}/pay`, {}));
-  const restock = (g) => act(() => post(`/grocery/${g.id}/need`, {}));
+  const dayOf = (iso) => new Intl.DateTimeFormat('en-CA', { timeZone: tz || 'Asia/Kolkata' }).format(new Date(iso));
 
-  const now = [];
-  const later = [];
+  const pending = [];
   const soon = [];
+  const done = [];
 
-  // Medicine: doses that were missed or are due within the next half hour need you now; the rest wait.
   for (const m of d.medicinesDueToday || []) {
-    if (m.status === 'given' || m.status === 'skipped') continue;
     const mine = m.forMember?.membershipId === me;
-    const row = {
-      key: `med-${m.medicineId}-${m.time}`, icon: 'med', urgent: m.status === 'missed',
-      title: `${m.name}${m.dosage ? ` · ${m.dosage}` : ''}`,
-      sub: `${m.time}${mine ? '' : ` · ${m.forMember?.displayName || ''}`}${m.status === 'missed' ? ' · ⏰' : ''}`,
-      action: { label: t('today.given'), onClick: () => logDose(m, 'given') },
-      second: { label: t('today.skip'), onClick: () => logDose(m, 'skipped') },
-    };
-    (m.status === 'missed' || minutes(m.time) <= nowMin + 30 ? now : later).push(row);
+    const label = `${m.name}${m.dosage ? ` · ${m.dosage}` : ''}`;
+    const who = mine ? [] : [{ label: m.forMember?.displayName || '' }];
+    if (m.status === 'given') { done.push({ key: `med-${m.medicineId}-${m.time}`, chips: [{ label: t('today.done'), tone: 'ok' }, { label: m.time }], title: label }); continue; }
+    if (m.status === 'skipped') continue;
+    const missed = m.status === 'missed';
+    pending.push({
+      key: `med-${m.medicineId}-${m.time}`, now: missed || minutes(m.time) <= nowMin + 30,
+      chips: [...(missed ? [{ label: t('row.missed'), tone: 'warn' }] : []), { label: m.time }, ...who], title: label,
+      action: { label: t('today.given'), onClick: () => act(() => post(`/medicines/${m.medicineId}/logs`, { time: m.time, status: 'given' })) },
+      link: { label: t('today.skip'), onClick: () => act(() => post(`/medicines/${m.medicineId}/logs`, { time: m.time, status: 'skipped' })) },
+    });
   }
 
-  // Bills that are mine to enter or pay.
-  const billSeen = new Set();
+  const seen = new Set();
   for (const i of [...(d.billsNeedingAmount || []), ...(d.upcomingBills || [])]) {
-    if (billSeen.has(i.id) || i.status === 'paid') continue;
-    billSeen.add(i.id);
-    if (i.payer?.membershipId !== me) continue;
+    const dedupeKey = `${i.billId || i.id}:${i.dueDate}`; // one row per bill and date, even if the database ever holds twins
+    if (seen.has(dedupeKey) || i.status === 'paid') continue;
+    seen.add(dedupeKey);
     const needsAmount = i.status === 'awaiting_amount' || i.amount == null;
-    const dueSoon = i.overdue || i.daysLeft <= 2;
-    const row = {
-      key: `bill-${i.id}`, icon: 'bills', urgent: i.overdue,
-      title: needsAmount ? `${i.billTitle}` : `${i.billTitle} · ${rupees(i.amount)}`,
-      sub: i.overdue ? `${shortDate(i.dueDate)} · ⏰` : shortDate(i.dueDate),
-      action: needsAmount ? { label: t('today.enter'), onClick: () => setAmountFor(i) } : { label: t('today.pay'), onClick: () => payBill(i) },
-    };
-    (dueSoon || needsAmount ? now : soon).push(row);
+    if (i.payer?.membershipId !== me) { soon.push({ key: `bill-${i.id}`, href: '/money?tab=bills', title: i.billTitle, sub: shortDate(i.dueDate) }); continue; }
+    pending.push({
+      key: `bill-${i.id}`, now: i.overdue || i.daysLeft <= 2 || needsAmount,
+      chips: [...(i.overdue ? [{ label: t('row.overdue'), tone: 'warn' }] : []), { label: shortDate(i.dueDate) }, ...(needsAmount ? [{ label: t('row.amount') }] : [{ label: rupees(i.amount) }])],
+      title: i.billTitle,
+      action: needsAmount ? { label: t('today.enter'), onClick: () => setAmountFor(i) } : { label: t('today.pay'), onClick: () => act(() => post(`/bill-instances/${i.id}/pay`, {})) },
+    });
   }
 
-  // My tasks (bill tasks are covered by the bill rows above, so they are never counted twice).
   for (const task of (d.myTasks || []).filter((x) => x.kind !== 'bill')) {
     const overdue = task.dueDate && task.dueDate < today;
-    const row = {
-      key: `task-${task.id}`, icon: 'tasks', urgent: overdue, title: task.title,
-      sub: task.dueDate ? (overdue ? `${shortDate(task.dueDate)} · ⏰` : shortDate(task.dueDate)) : '',
-      check: { label: t('today.done'), onClick: () => complete(task) },
-    };
-    (overdue || task.dueDate === today ? now : later).push(row);
+    pending.push({
+      key: `task-${task.id}`, now: overdue || task.dueDate === today,
+      chips: [...(overdue ? [{ label: t('row.overdue'), tone: 'warn' }] : []), ...(task.dueDate ? [{ label: shortDate(task.dueDate) }] : [])],
+      title: task.title, action: { label: t('today.done'), onClick: () => act(() => post(`/tasks/${task.id}/complete`, {})) },
+    });
   }
-
-  for (const s of (d.specialDatesSoon || []).filter((x) => x.daysAway <= 14)) {
-    soon.push({ key: `sd-${s.id}`, icon: 'days', title: s.title, sub: s.daysAway === 0 ? t('today.now') : shortDate(s.nextDate), href: '/special-days' });
+  for (const task of (doneTasks || []).filter((x) => x.completedAt && dayOf(x.completedAt) === today && x.completedBy?.membershipId === me)) {
+    done.push({ key: `done-${task.id}`, chips: [{ label: t('today.done'), tone: 'ok' }], title: task.title });
   }
-  for (const doc of d.expiringDocuments || []) soon.push({ key: `doc-${doc.id}`, icon: 'docs', title: doc.title, sub: shortDate(doc.expiryDate), href: '/documents' });
+  for (const s of (d.specialDatesSoon || []).filter((x) => x.daysAway <= 14)) soon.push({ key: `sd-${s.id}`, href: '/special-days', title: s.title, sub: s.daysAway === 0 ? t('today.now') : shortDate(s.nextDate) });
+  for (const doc of d.expiringDocuments || []) soon.push({ key: `doc-${doc.id}`, href: '/documents', title: doc.title, sub: shortDate(doc.expiryDate) });
 
-  const total = now.length + later.length + soon.length;
-  const LIMIT = 5;
-  const sentence = now.length === 0 ? t('today.calm') : now.length === 1 ? t('today.one') : `${now.length} ${t('today.many')}`;
-
-  // Respect the limit across groups, in priority order, unless expanded.
-  let budget = expanded ? Infinity : LIMIT;
-  const slice = (list) => { const out = list.slice(0, Math.max(0, budget)); budget -= out.length; return out; };
-  const shownNow = slice(now); const shownLater = slice(later); const shownSoon = slice(soon);
-  const hidden = total - shownNow.length - shownLater.length - shownSoon.length;
+  // Urgent first, then the rest of today.
+  pending.sort((a, b) => Number(b.now) - Number(a.now));
+  const total = pending.length + done.length;
+  const pct = total ? Math.round((done.length / total) * 100) : 0;
+  const filled = total ? Math.round((done.length / total) * 10) : 0;
+  const LIMIT = 4;
+  const shown = expanded ? pending : pending.slice(0, LIMIT);
+  const hidden = pending.length - shown.length;
+  const urgent = pending.filter((r) => r.now).length;
+  const sentence = urgent === 0 ? t('today.calm') : urgent === 1 ? t('today.one') : `${urgent} ${t('today.many')}`;
 
   const meals = (d.todayMeals || []).filter((m) => m.items?.length);
   const net = d.wallet?.net || 0;
   const low = d.grocery?.likelyLow || [];
-
-  const group = (label, rows) => rows.length ? (
-    <section>
-      <h2 className="today-group">{label}</h2>
-      <div className="moments">{rows.map(({ key, ...r }) => <Moment key={key} {...r} />)}</div>
-    </section>
-  ) : null;
 
   return (
     <div>
       <h1 className="today-hello">{greet}{first ? `, ${first}` : ''}</h1>
       <p className="today-sentence">{sentence}</p>
 
-      {group(now.length ? t('today.now') : null, shownNow)}
-      {group(t('today.later'), shownLater)}
-      {group(t('today.soon'), shownSoon)}
-      {hidden > 0 ? <button type="button" className="link-btn" onClick={() => setExpanded(true)}>{t('today.more')} ({hidden})</button> : null}
-      {expanded && total > LIMIT ? <button type="button" className="link-btn" onClick={() => setExpanded(false)}>{t('today.less')}</button> : null}
-
-      <h2 className="today-group">{family?.name}</h2>
-      <div className="moments">
-        {meals.length ? (
-          <Link href="/planner?tab=meals" className="today-line"><span className="row" style={{ gap: 10 }}><Icon name="meals" size={20} /><span>{meals.map((m) => m.items.join(', ')).join(' · ')}</span></span></Link>
-        ) : null}
-        {d.grocery?.needed ? (
-          <Link href="/planner?tab=grocery" className="today-line"><span className="row" style={{ gap: 10 }}><Icon name="cart" size={20} /><span>{d.grocery.needed} {t('today.grocery_n')}</span></span><Icon name="back" size={16} /></Link>
-        ) : null}
-        {low.length ? (
-          <div className="today-line"><span>{t('today.low')}: {low.slice(0, 3).map((g) => g.name).join(', ')}</span><button type="button" className="moment-act ghost" onClick={() => low.slice(0, 3).forEach(restock)}>{t('today.restock')}</button></div>
-        ) : null}
-        {net !== 0 ? (
-          <Link href="/money?tab=wallet" className="today-line"><span>{net < 0 ? t('today.owe') : t('today.owed')} <b>{rupees(Math.abs(net))}</b></span><span className="small muted">{t('dash.settle_up')}</span></Link>
-        ) : null}
+      <div className="wk-head">
+        <button type="button" className="wk-arrow" aria-label="Previous week" onClick={() => setAnchor(shift(mid, -7))}>‹</button>
+        <b>{fmt(day, lang, { month: 'long' })}</b>
+        <button type="button" className="wk-arrow" aria-label="Next week" onClick={() => setAnchor(shift(mid, 7))}>›</button>
+      </div>
+      <div className="wk-strip" role="tablist" aria-label="Week">
+        {days.map((s, i) => (
+          <button key={s} type="button" role="tab" aria-selected={s === day} className={`wk-day ${s === day ? 'on' : ''} ${s === today ? 'today' : ''} ${Math.abs(i - 3) >= 3 ? 'far' : ''}`} onClick={() => setSel(s === today ? null : s)}>
+            <small>{fmt(s, lang, { weekday: 'short' })}</small>
+            <span>{Number(s.slice(8))}</span>
+            <i />
+          </button>
+        ))}
       </div>
 
-      <div style={{ marginTop: 18 }}><NotificationAsk t={t} /></div>
+      {day !== today ? <DayTimeline day={day} today={today} t={t} /> : (
+        <>
+          <section className="goal" aria-label={t('goal.title')}>
+            <div className="goal-top"><span>{t('goal.title')}</span><span><b>{done.length}/{total}</b> {t('goal.completed')}</span></div>
+            <div className="goal-body">
+              <div className="goal-pct">{total ? pct : '—'}{total ? <small>%</small> : null}</div>
+              <div className="dots" aria-hidden="true">{Array.from({ length: 10 }, (_, i) => <i key={i} className={i < filled ? 'on' : ''} />)}</div>
+            </div>
+          </section>
+
+          {shown.length || done.length ? (
+            <div className="trows">
+              {shown.map(({ key, now, ...r }) => <TaskRow key={key} {...r} />)}
+              {done.slice(0, 3).map(({ key, ...r }) => <TaskRow key={key} done {...r} />)}
+            </div>
+          ) : null}
+          {hidden > 0 ? <button type="button" className="link-btn" onClick={() => setExpanded(true)}>{t('today.more')} ({hidden})</button> : null}
+          {expanded && pending.length > LIMIT ? <button type="button" className="link-btn" onClick={() => setExpanded(false)}>{t('today.less')}</button> : null}
+
+          {soon.length ? (
+            <>
+              <h2 className="today-title">{t('today.soon')}</h2>
+              <div className="mini-lines">
+                {soon.slice(0, 4).map((s) => <Link key={s.key} href={s.href} className="mini-line"><span>{s.title}</span><span className="small muted">{s.sub}</span></Link>)}
+              </div>
+            </>
+          ) : null}
+
+          <h2 className="today-title">{family?.name}</h2>
+          <div className="mini-lines">
+            {meals.length ? <Link href="/planner?tab=meals" className="mini-line"><span>{meals.map((m) => m.items.join(', ')).join(' · ')}</span><Icon name="meals" size={20} /></Link> : null}
+            {d.grocery?.needed ? <Link href="/planner?tab=grocery" className="mini-line"><span>{d.grocery.needed} {t('today.grocery_n')}</span><Icon name="cart" size={20} /></Link> : null}
+            {low.length ? (
+              <div className="mini-line"><span>{t('today.low')}: {low.slice(0, 3).map((g) => g.name).join(', ')}</span><button type="button" className="chip" style={{ border: 0, cursor: 'pointer' }} onClick={() => low.slice(0, 3).forEach((g) => act(() => post(`/grocery/${g.id}/need`, {})))}>{t('today.restock')}</button></div>
+            ) : null}
+            {net !== 0 ? <Link href="/money?tab=wallet" className="mini-line"><span>{net < 0 ? t('today.owe') : t('today.owed')} <b>{rupees(Math.abs(net))}</b></span><span className="small muted">{t('dash.settle_up')}</span></Link> : null}
+          </div>
+          <div style={{ marginTop: 18 }}><NotificationAsk t={t} /></div>
+        </>
+      )}
 
       {amountFor ? <AmountSheet inst={amountFor} onClose={() => { setAmountFor(null); reload(); }} /> : null}
     </div>

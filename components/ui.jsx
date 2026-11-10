@@ -349,48 +349,6 @@ export function MemberChecks({ members, value, onChange }) {
   );
 }
 
-export const COMMON_UNITS = ['pcs', 'kg', 'g', 'L', 'ml', 'pack', 'doz', 'box', 'bottle', 'bunch'];
-
-export function UnitButtons({ selected, onSelect }) {
-  return (
-    <div className="unit-buttons-bar" role="radiogroup" aria-label="Units">
-      {COMMON_UNITS.map((u) => {
-        const isSel = selected === u;
-        return (
-          <button
-            key={u}
-            type="button"
-            role="radio"
-            aria-checked={isSel}
-            className={`unit-btn ${isSel ? 'active' : ''}`}
-            onClick={() => onSelect(isSel ? '' : u)}
-          >
-            {u}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-export function parseQty(qtyStr) {
-  if (!qtyStr) return { amount: '', unit: 'pcs' };
-  const str = String(qtyStr).trim();
-  const match = str.match(/^([\d.,/]+)\s*(.*)$/);
-  if (!match) return { amount: str, unit: '' };
-  const amount = match[1];
-  const unitRaw = match[2].trim().toLowerCase();
-  const found = COMMON_UNITS.find((u) => u.toLowerCase() === unitRaw) || unitRaw;
-  return { amount, unit: found };
-}
-
-export function formatQty(amount, unit) {
-  const cleanAmount = (amount || '').trim();
-  const cleanUnit = (unit || '').trim();
-  if (cleanAmount && cleanUnit) return `${cleanAmount} ${cleanUnit}`;
-  return cleanAmount || cleanUnit || '';
-}
-
 export const Icon = ({ name, size = 20 }) => {
   const paths = {
     home: 'M3 9.5L12 3l9 6.5V20a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 20V9.5z M9 21v-6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6',

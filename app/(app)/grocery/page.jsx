@@ -2,15 +2,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { post, patch, del } from '@/lib/api';
 import { useAuth, useData, notifyChanged } from '@/lib/auth';
-import { Btn, Empty, ErrorNote, Field, Icon, Input, Sheet, Spinner, UnitButtons, parseQty, formatQty, useAction, useToast } from '@/components/ui';
+import { Btn, Empty, ErrorNote, Field, Icon, Input, Sheet, Spinner, useAction, useToast } from '@/components/ui';
 import { toPaise, timeAgo } from '@/lib/format';
+import Accordion from '@/components/Accordion';
+
+const tileOf = (name) => { let h = 0; for (const c of name) h = (h * 31 + c.codePointAt(0)) % 5; return `t${h}`; };
+const initial = (name) => Array.from(name.trim())[0]?.toUpperCase() || '·';
+const lead = (q) => /^(\d+(?:\.\d+)?)\s*(.*)$/.exec(String(q || '').trim());
+
 
 function ItemSheet({ item, onClose, onDone }) {
   const { t } = useAuth();
   const [name, setName] = useState(item.name);
-  const parsed = parseQty(item.qty);
-  const [amount, setAmount] = useState(parsed.amount);
-  const [unit, setUnit] = useState(parsed.unit);
+  const [qty, setQty] = useState(item.qty || '');
   const [price, setPrice] = useState(item.lastPrice ? String(item.lastPrice / 100) : '');
   const [run, busy] = useAction();
 
@@ -18,16 +22,11 @@ function ItemSheet({ item, onClose, onDone }) {
     e.preventDefault();
     const cleanName = name.trim();
     if (!cleanName) return;
-    const finalQty = formatQty(amount, unit);
     const ok = await run(async () => {
-      if (cleanName !== item.name || finalQty !== (item.qty || '')) {
-        await patch(`/grocery/${item.id}`, { name: cleanName, qty: finalQty || undefined });
-      }
+      if (cleanName !== item.name || qty.trim() !== (item.qty || '')) await patch(`/grocery/${item.id}`, { name: cleanName, qty: qty.trim() || undefined });
       const p = toPaise(price);
       // Recording the cost also adds it to the family expenses (split equally); repeating it only corrects that expense.
-      if (p && p !== item.lastPrice) {
-        await post(`/grocery/${item.id}/price`, { price: p });
-      }
+      if (p && p !== item.lastPrice) await post(`/grocery/${item.id}/price`, { price: p });
     });
     if (ok) { onDone(); onClose(); }
   };
@@ -35,27 +34,18 @@ function ItemSheet({ item, onClose, onDone }) {
 
   return (
     <Sheet title={item.name} onClose={onClose}>
-      <form className="col" onSubmit={save} style={{ gap: 14 }}>
-        <Field label={t('add.grocery')}>
-          {(id) => <Input id={id} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required autoFocus />}
-        </Field>
-        <Field label={t('grocery.field_qty') || 'Quantity'}>
-          {(id) => (
-            <div className="col" style={{ gap: 8 }}>
-              <Input
-                id={id}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="400, 2, 1.5…"
-                maxLength={30}
-              />
-              <UnitButtons selected={unit} onSelect={setUnit} />
+      <form className="col" onSubmit={save}>
+        <Field label={t('add.grocery')}>{(id) => <Input id={id} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required />}</Field>
+        <Field label="Qty">{(id) => (
+          <div className="row" style={{ gap: 10 }}>
+            <Input id={id} value={qty} onChange={(e) => setQty(e.target.value)} maxLength={30} placeholder="1 L, 500 g…" />
+            <div className="stepper" role="group" aria-label="Quantity">
+              <button type="button" aria-label="−" onClick={() => { const m = lead(qty); if (m) setQty(Number(m[1]) <= 1 ? m[2] : `${Number(m[1]) - 1} ${m[2]}`.trim()); }}>−</button>
+              <button type="button" aria-label="+" onClick={() => { const m = lead(qty); setQty(m ? `${Number(m[1]) + 1} ${m[2]}`.trim() : `1 ${qty}`.trim()); }}>+</button>
             </div>
-          )}
-        </Field>
-        <Field label={`₹ ${t('add.amount')}`} hint="Added to the family expenses, split equally">
-          {(id) => <Input id={id} inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0" />}
-        </Field>
+          </div>
+        )}</Field>
+        <Field label={`₹ ${t('add.amount')}`} hint="Added to the family expenses, split equally">{(id) => <Input id={id} inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0" />}</Field>
         <Btn type="submit" disabled={busy || !name.trim()}>{t('btn.save')}</Btn>
         <Btn type="button" tone="ghost" onClick={remove} disabled={busy}>{t('btn.delete')}</Btn>
       </form>
@@ -70,7 +60,6 @@ export default function Grocery() {
   const [run] = useAction();
   const [text, setText] = useState('');
   const [edit, setEdit] = useState(null);
-  const [showStock, setShowStock] = useState(false);
   const inputRef = useRef(null);
   useEffect(() => { if (new URLSearchParams(window.location.search).get('add') === '1') inputRef.current?.focus(); }, []);
 
@@ -106,84 +95,40 @@ export default function Grocery() {
       </form>
 
       {needed.length === 0 ? <Empty>{t('today.calm')}</Empty> : (
-        <div className="shop-list" role="list">
+        <div className="pcards" role="list">
           {needed.map((g) => (
-            <div className="shop-row" role="listitem" key={g.id}>
-              <button
-                type="button"
-                className="moment-check"
-                aria-label={`${g.name} ✓`}
-                onClick={() => flip(g, 'bought')}
-                title="Mark bought"
-              >
-                <Icon name="check" size={18} />
+            <div className="pcard" role="listitem" key={g.id}>
+              <span className={`ptile ${tileOf(g.name)}`} aria-hidden="true">{initial(g.name)}</span>
+              <button type="button" className="pbody" onClick={() => setEdit(g)}>
+                <div className="pname">{g.name}</div>
+                {g.qty || g.lastPrice ? <div className="psub">{[g.qty, g.lastPrice ? `₹${Math.round(g.lastPrice / 100)}` : ''].filter(Boolean).join(' · ')}</div> : null}
               </button>
-              <button type="button" className="shop-name" onClick={() => setEdit(g)}>
-                <span>{g.name}</span>
-                {g.qty ? <span className="shop-qty">{g.qty}</span> : null}
-              </button>
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label={`Edit ${g.name}`}
-                onClick={() => setEdit(g)}
-                title="Edit item"
-                style={{ opacity: 0.55, flexShrink: 0 }}
-              >
-                <Icon name="edit" size={16} />
-              </button>
+              <button type="button" className="round-act" aria-label={`${g.name} ✓`} onClick={() => flip(g, 'bought')}><Icon name="check" size={22} /></button>
             </div>
           ))}
         </div>
       )}
 
       {stocked.length ? (
-        <>
-          <button type="button" className="link-btn" style={{ marginTop: 14 }} onClick={() => setShowStock((v) => !v)} aria-expanded={showStock}>
-            {showStock ? '▾' : '▸'} {t('grocery.in_stock') || 'In stock'} ({stocked.length})
-          </button>
-          {showStock ? (
-            <div className="shop-list" role="list">
-              {stocked.map((g) => (
-                <div className="shop-row is-stock" role="listitem" key={g.id}>
-                  <button
-                    type="button"
-                    className="moment-check done"
-                    aria-label={`${g.name} in stock`}
-                    onClick={() => flip(g, 'need')}
-                    title="Move back to needed"
-                  >
-                    <Icon name="check" size={18} />
-                  </button>
-                  <button type="button" className="shop-name" onClick={() => setEdit(g)}>
-                    <span>{g.name}</span>
-                    {g.qty ? <span className="shop-qty">{g.qty}</span> : null}
-                    {g.lastPrice ? <span className="shop-qty price-pill">₹{Math.round(g.lastPrice / 100)}</span> : null}
-                    {g.lastBought?.at ? <span className="shop-qty">· {timeAgo(g.lastBought.at)}</span> : null}
-                  </button>
-                  <button
-                    type="button"
-                    className="moment-act ghost"
-                    onClick={() => flip(g, 'need')}
-                    style={{ minHeight: 36, padding: '0 12px', fontSize: 13 }}
-                  >
-                    {t('grocery.need_again') || 'Need again'}
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    aria-label={`Edit ${g.name}`}
-                    onClick={() => setEdit(g)}
-                    title="Edit item"
-                    style={{ opacity: 0.55, flexShrink: 0 }}
-                  >
-                    <Icon name="edit" size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </>
+        <div style={{ marginTop: 18 }}>
+          <Accordion items={[{
+            id: 'stock', title: t('grocery.in_stock') || 'In stock', badge: stocked.length,
+            body: (
+              <div className="pcards">
+                {stocked.map((g) => (
+                  <div className="pcard is-stock" key={g.id}>
+                    <span className={`ptile ${tileOf(g.name)}`} aria-hidden="true">{initial(g.name)}</span>
+                    <button type="button" className="pbody" onClick={() => setEdit(g)}>
+                      <div className="pname">{g.name}</div>
+                      <div className="psub">{[g.lastPrice ? `₹${Math.round(g.lastPrice / 100)}` : '', g.lastBought?.at ? timeAgo(g.lastBought.at) : ''].filter(Boolean).join(' · ')}</div>
+                    </button>
+                    <button type="button" className="round-act quiet" style={{ width: 'auto', borderRadius: 999, padding: '0 14px', height: 44, fontSize: 14 }} onClick={() => flip(g, 'need')}>{t('grocery.need_again') || 'Need again'}</button>
+                  </div>
+                ))}
+              </div>
+            ),
+          }]} />
+        </div>
       ) : null}
 
       {edit ? <ItemSheet item={edit} onClose={() => setEdit(null)} onDone={changed} /> : null}

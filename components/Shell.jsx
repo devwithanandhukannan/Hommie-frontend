@@ -67,7 +67,7 @@ function FamilySwitcher({ onClose }) {
 }
 
 export default function Shell({ children }) {
-  const { family, families, familyId, t, user } = useAuth();
+  const { family, families, familyId, t, user, savedView } = useAuth();
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -225,6 +225,7 @@ export default function Shell({ children }) {
               {profile}
             </div>
           </div>
+          {savedView ? <div className="saved-banner" role="status">{t('common.offline_saved')}</div> : null}
           {children}
         </main>
         <nav className="tabbar mobile-only" aria-label="Main navigation">
