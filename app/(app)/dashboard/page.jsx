@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { post } from '@/lib/api';
 import { useAuth, useData, notifyChanged } from '@/lib/auth';
-import { Icon, Btn, Sheet, Spinner, ErrorNote, useAction } from '@/components/ui';
+import { Icon, Btn, Sheet, Skeleton, CardListSkeleton, ErrorNote, useAction } from '@/components/ui';
 import { rupees, toPaise, shortDate, todayStr } from '@/lib/format';
 import { requestNotifications } from '@/lib/permissions';
 
@@ -69,7 +69,13 @@ function NotificationAsk({ t }) {
 
 function DayTimeline({ day, today, t }) {
   const { data, loading } = useData(`/calendar?from=${day}&to=${day}`);
-  if (loading && !data) return <Spinner />;
+  if (loading && !data) {
+    return (
+      <div className="col" style={{ gap: 10, marginTop: 14 }} role="status" aria-busy="true" aria-label="Loading">
+        {[0, 1, 2].map((i) => <Skeleton key={i} width={i === 1 ? '76%' : '90%'} height={44} radius={14} />)}
+      </div>
+    );
+  }
   const timeOf = (e) => { const m = /(\d{1,2}:\d{2})/.exec(`${e.title} ${e.subtitle || ''}`); return m ? m[1].padStart(5, '0') : null; };
   const slot = { Breakfast: '08:00', Lunch: '13:00', Dinner: '20:00' };
   const events = (data?.byDate?.[day] || []).map((e) => ({ ...e, time: timeOf(e) || (e.type === 'meal' ? slot[e.subtitle] : null) }))
@@ -102,7 +108,26 @@ export default function Today() {
   const mid = anchor || today;
   const days = useMemo(() => [-3, -2, -1, 0, 1, 2, 3].map((n) => shift(mid, n)), [mid]);
 
-  if (loading && !d) return <Spinner />;
+  if (loading && !d) {
+    return (
+      <div className="today-grid" role="status" aria-busy="true" aria-label="Loading">
+        <div className="today-main">
+          <div className="col" style={{ gap: 10, marginBottom: 16 }}>
+            <Skeleton width={220} height={32} radius={10} />
+            <Skeleton width={170} height={14} />
+          </div>
+          <div className="skel-week" style={{ marginBottom: 16 }}>
+            {Array.from({ length: 7 }, (_, i) => <Skeleton key={i} width="100%" height={56} radius={16} />)}
+          </div>
+          <Skeleton width="100%" height={92} radius={24} style={{ marginBottom: 16 }} />
+          <CardListSkeleton rows={3} />
+        </div>
+        <aside className="today-side" aria-hidden="true">
+          <CardListSkeleton rows={3} header />
+        </aside>
+      </div>
+    );
+  }
   if (error && !d) return <ErrorNote error={error} />;
 
   const me = family?.myMembershipId;

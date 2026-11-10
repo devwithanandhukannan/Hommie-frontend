@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import Shell from '@/components/Shell';
-import { Spinner, Btn } from '@/components/ui';
+import { ShellSkeleton, Btn } from '@/components/ui';
 
 export default function AppLayout({ children }) {
   const { status, family, families, retryBoot, t } = useAuth();
@@ -23,6 +23,6 @@ export default function AppLayout({ children }) {
       </div>
     );
   }
-  if (status !== 'authed' || !family) return <Spinner />;
+  if (status !== 'authed' || !family) return <ShellSkeleton />;
   return <Shell>{children}</Shell>;
 }

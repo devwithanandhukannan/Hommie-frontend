@@ -24,7 +24,7 @@ export function formatErrorMessage(error) {
     /failed to fetch csrf token/i.test(raw);
 
   if (isHtml || isColdStartOrGateway) {
-    return 'The server is waking up or temporarily unavailable. Please try again in a few moments.';
+    return 'Server temporarily unavailable. Please try again in a moment.';
   }
 
   // Detect network/connectivity failures
@@ -43,7 +43,77 @@ export function formatErrorMessage(error) {
   return clean;
 }
 
-export const Spinner = () => <div className="spinner" role="status" aria-label="Loading" />;
+export function Skeleton({ width = '100%', height = 14, radius = 8, className = '', style }) {
+  return <span className={`skel ${className}`} aria-hidden="true" style={{ width, height, borderRadius: radius, ...style }} />;
+}
+
+export function CardListSkeleton({ rows = 4, header = false }) {
+  return (
+    <section className="card skel-card" role="status" aria-busy="true" aria-label="Loading">
+      {header ? (
+        <>
+          <Skeleton width={96} height={12} />
+          <Skeleton width={150} height={34} radius={10} />
+        </>
+      ) : null}
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="skel-row">
+          <div className="grow col" style={{ gap: 6 }}>
+            <Skeleton width={i % 2 === 0 ? '64%' : '48%'} height={15} />
+            <Skeleton width={i % 2 === 0 ? '38%' : '52%'} height={11} />
+          </div>
+          <Skeleton width={54} height={18} radius={999} />
+        </div>
+      ))}
+    </section>
+  );
+}
+
+export function PageSkeleton({ cards = 2, rows = 4 }) {
+  return (
+    <div className="skel-page" role="status" aria-busy="true" aria-label="Loading">
+      <div className="row between" style={{ marginBottom: 4 }}>
+        <Skeleton width={160} height={26} radius={10} />
+        <Skeleton width={88} height={36} radius={999} />
+      </div>
+      {Array.from({ length: cards }, (_, c) => (
+        <CardListSkeleton key={c} rows={c === 0 ? rows : Math.max(2, rows - 1)} />
+      ))}
+    </div>
+  );
+}
+
+export function ShellSkeleton() {
+  return (
+    <div className="shell" role="status" aria-busy="true" aria-label="Loading">
+      <aside className="side" aria-hidden="true">
+        <div className="row" style={{ gap: 8, marginBottom: 14 }}>
+          <Skeleton width={110} height={34} radius={999} />
+          <Skeleton width={34} height={34} radius={999} />
+        </div>
+        <Skeleton width="100%" height={46} radius={14} style={{ marginBottom: 12 }} />
+        {Array.from({ length: 6 }, (_, i) => (
+          <Skeleton key={i} width={i % 2 ? '72%' : '84%'} height={36} radius={12} style={{ marginBottom: 6 }} />
+        ))}
+      </aside>
+      <main className="main">
+        <PageSkeleton cards={2} rows={4} />
+      </main>
+    </div>
+  );
+}
+
+export function Spinner({ size, cards = 2, rows = 4 }) {
+  if (size != null) {
+    const dot = Math.max(4, Math.round(size * 0.36));
+    return (
+      <span className="skel-dots" role="status" aria-label="Loading" style={{ '--dot-size': `${dot}px` }}>
+        <i /><i /><i />
+      </span>
+    );
+  }
+  return <PageSkeleton cards={cards} rows={rows} />;
+}
 export const ErrorNote = ({ error }) => {
   const msg = formatErrorMessage(error);
   if (!msg) return null;

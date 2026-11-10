@@ -3,7 +3,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { del, patch, post } from '@/lib/api';
 import { useAuth, useData, notifyChanged } from '@/lib/auth';
-import { Badge, Btn, Empty, ErrorNote, Field, Input, MemberChecks, MemberSelect, Select, Sheet, Spinner, Tabs, useAction, useConfirm } from '@/components/ui';
+import { Badge, Btn, CardListSkeleton, Empty, ErrorNote, Field, Input, MemberChecks, MemberSelect, PageSkeleton, Select, Sheet, Skeleton, Tabs, useAction, useConfirm } from '@/components/ui';
 import { CATEGORY_LABEL, rupees, shortDate, timeAgo, todayStr, toPaise } from '@/lib/format';
 import BillsPage from '../bills/page';
 
@@ -288,7 +288,7 @@ function Expenses({ unbilled = [], onBilled }) {
 
       <div className="money-grid">
         <div>
-          {rep.loading && !rep.data ? <Spinner /> : rep.error ? <ErrorNote error={rep.error} /> : (
+          {rep.loading && !rep.data ? <CardListSkeleton rows={3} header /> : rep.error ? <ErrorNote error={rep.error} /> : (
             <section className="card" aria-label="Monthly summary">
               <div className="row between">
                 <span className="muted small">{t('money.total_spent')}</span>
@@ -318,7 +318,7 @@ function Expenses({ unbilled = [], onBilled }) {
         </div>
 
         <div>
-          {list.loading && !list.data ? <Spinner /> : list.data?.length ? (
+          {list.loading && !list.data ? <CardListSkeleton rows={4} /> : list.data?.length ? (
             <div className="card list">
               {list.data.map((e) => {
                 const title = e.note || catLabel(t, e.category);
@@ -387,7 +387,14 @@ function Wallet() {
   const { data, error, loading, reload } = useData('/wallet');
   const hist = useData('/wallet/settlements');
   const [settle, setSettle] = useState(null);
-  if (loading && !data) return <Spinner />;
+  if (loading && !data) {
+    return (
+      <div className="money-grid">
+        <Skeleton width="100%" height={138} radius={24} />
+        <CardListSkeleton rows={3} header />
+      </div>
+    );
+  }
   if (error) return <ErrorNote error={error} />;
   const { me } = data;
   return (
@@ -447,5 +454,5 @@ function MoneyContent() {
 }
 
 export default function MoneyPage() {
-  return <Suspense fallback={<Spinner />}><MoneyContent /></Suspense>;
+  return <Suspense fallback={<PageSkeleton />}><MoneyContent /></Suspense>;
 }
