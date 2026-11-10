@@ -5,7 +5,7 @@ const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isProd ? '' : " 'unsafe-eval'"}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: https://www.themealdb.com https://upload.wikimedia.org https://thumb.wikimedia.org",
   "media-src 'self' blob: data:",
   "font-src 'self'",
   "connect-src 'self' blob:",

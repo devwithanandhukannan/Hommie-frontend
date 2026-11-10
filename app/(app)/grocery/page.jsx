@@ -10,6 +10,21 @@ const tileOf = (name) => { let h = 0; for (const c of name) h = (h * 31 + c.code
 const initial = (name) => Array.from(name.trim())[0]?.toUpperCase() || '·';
 const lead = (q) => /^(\d+(?:\.\d+)?)\s*(.*)$/.exec(String(q || '').trim());
 
+function ItemThumb({ item }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { setFailed(false); }, [item.imageUrl]);
+
+  if (!item.imageUrl || failed) {
+    return <span className={`ptile ${tileOf(item.name)}`} aria-hidden="true">{initial(item.name)}</span>;
+  }
+  const isCutout = item.imageUrl.startsWith('https://www.themealdb.com/');
+  return (
+    <span className={`ptile has-img ${isCutout ? 'is-cutout' : 'is-photo'}`} aria-hidden="true">
+      <img src={item.imageUrl} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
+    </span>
+  );
+}
+
 
 function ItemSheet({ item, onClose, onDone }) {
   const { t } = useAuth();
@@ -61,7 +76,16 @@ export default function Grocery() {
   const [text, setText] = useState('');
   const [edit, setEdit] = useState(null);
   const inputRef = useRef(null);
+  const backfillRef = useRef(false);
   useEffect(() => { if (new URLSearchParams(window.location.search).get('add') === '1') inputRef.current?.focus(); }, []);
+
+  // Existing items missing an imageUrl are resolved lazily on GET /grocery; refresh once after 2.4s to display them.
+  useEffect(() => {
+    if (backfillRef.current || !Array.isArray(data) || !data.some((g) => !g.imageUrl)) return;
+    backfillRef.current = true;
+    const id = setTimeout(() => reload(), 2400);
+    return () => clearTimeout(id);
+  }, [data, reload]);
 
   if (loading && !data) return <Spinner />;
   if (error && !data) return <ErrorNote error={error} />;
@@ -98,7 +122,7 @@ export default function Grocery() {
         <div className="pcards" role="list">
           {needed.map((g) => (
             <div className="pcard" role="listitem" key={g.id}>
-              <span className={`ptile ${tileOf(g.name)}`} aria-hidden="true">{initial(g.name)}</span>
+              <ItemThumb item={g} />
               <button type="button" className="pbody" onClick={() => setEdit(g)}>
                 <div className="pname">{g.name}</div>
                 {g.qty || g.lastPrice ? <div className="psub">{[g.qty, g.lastPrice ? `₹${Math.round(g.lastPrice / 100)}` : ''].filter(Boolean).join(' · ')}</div> : null}
@@ -117,7 +141,7 @@ export default function Grocery() {
               <div className="pcards">
                 {stocked.map((g) => (
                   <div className="pcard is-stock" key={g.id}>
-                    <span className={`ptile ${tileOf(g.name)}`} aria-hidden="true">{initial(g.name)}</span>
+                    <ItemThumb item={g} />
                     <button type="button" className="pbody" onClick={() => setEdit(g)}>
                       <div className="pname">{g.name}</div>
                       <div className="psub">{[g.lastPrice ? `₹${Math.round(g.lastPrice / 100)}` : '', g.lastBought?.at ? timeAgo(g.lastBought.at) : ''].filter(Boolean).join(' · ')}</div>
