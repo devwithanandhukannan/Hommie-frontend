@@ -2,9 +2,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { api, get, post, upload, getBlob } from '@/lib/api';
-import { useAuth } from '@/lib/auth';
+import { useAuth, notifyChanged } from '@/lib/auth';
 import { translateNotificationText } from '@/lib/i18n';
-import { Avatar, Icon, Spinner, useAction, useToast } from '@/components/ui';
+import { localeForUiLang } from '@/lib/useVoiceInput';
+import { sanitizeAiActions } from '@/lib/aiActions';
+import AiActionsList from '@/components/AiActionsList';
+import { Avatar, Icon, Spinner, formatErrorMessage, useAction, useToast } from '@/components/ui';
 import { hhmm } from '@/lib/format';
 import AiAssistantModal from './AiAssistantModal';
 
@@ -159,12 +162,14 @@ function AiActionCard({ attachmentId, text, lang, t, onApplied }) {
     setState('loading');
     setErrorMsg('');
     try {
-      const res = await post('/ai/analyze', { attachmentId, text });
+      const payload = { attachmentId, text };
+      if (lang && lang !== 'en') payload.speechLang = localeForUiLang(lang);
+      const res = await post('/ai/analyze', payload);
       setAnalysis(res);
       setSelectedActions(res.actions || []);
       setState('scanned');
     } catch (err) {
-      setErrorMsg(err.message || 'AI analysis failed');
+      setErrorMsg(formatErrorMessage(err) || 'AI analysis failed');
       setState('error');
     }
   };
@@ -180,24 +185,17 @@ function AiActionCard({ attachmentId, text, lang, t, onApplied }) {
   const apply = async () => {
     if (selectedActions.length === 0) return;
     setApplying(true);
+    setErrorMsg('');
     try {
-      await post('/ai/apply', { actions: selectedActions, notifyInChat: true });
+      await post('/ai/apply', { actions: sanitizeAiActions(selectedActions), notifyInChat: true });
       setState('applied');
+      notifyChanged();
       if (onApplied) onApplied();
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to save items');
+      setErrorMsg(formatErrorMessage(err) || 'Failed to save items');
     } finally {
       setApplying(false);
     }
-  };
-
-  const renderActionIcon = (type) => {
-    if (type?.includes('grocery')) return <Icon name="cart" size={16} />;
-    if (type?.includes('bill')) return <Icon name="bills" size={16} />;
-    if (type?.includes('expense')) return <Icon name="money" size={16} />;
-    if (type?.includes('meal')) return <Icon name="meals" size={16} />;
-    if (type?.includes('medicine')) return <Icon name="med" size={16} />;
-    return <Icon name="tasks" size={16} />;
   };
 
   if (state === 'idle') {
@@ -223,24 +221,15 @@ function AiActionCard({ attachmentId, text, lang, t, onApplied }) {
     );
   }
 
-  if (state === 'applied') {
-    return (
-      <div className="ai-applied-badge">
-        <Icon name="check" size={14} />
-        <span>{t('chat.ai_added_badge')}</span>
-      </div>
-    );
-  }
-
   if (state === 'error') {
     return (
-      <div style={{ fontSize: 11, color: '#DC2626', marginTop: 4 }}>
+      <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4 }}>
         {errorMsg} · <button type="button" onClick={scan} style={{ background: 'none', border: 'none', color: 'inherit', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>{lang === 'ml' ? 'വീണ്ടും ശ്രമിക്കുക' : 'Retry'}</button>
       </div>
     );
   }
 
-  if (state === 'scanned' && analysis) {
+  if ((state === 'scanned' || state === 'applied') && analysis) {
     return (
       <div className="ai-action-card">
         <div className="ai-card-header">
@@ -252,7 +241,7 @@ function AiActionCard({ attachmentId, text, lang, t, onApplied }) {
             type="button"
             className="ai-card-close"
             onClick={() => setState('idle')}
-            title="Close"
+            aria-label="Close"
           >
             <Icon name="close" size={14} />
           </button>
@@ -260,55 +249,26 @@ function AiActionCard({ attachmentId, text, lang, t, onApplied }) {
 
         {analysis.transcription ? (
           <div className="ai-transcription-box">
-            "{analysis.transcription}"
+            “{analysis.transcription}”
+          </div>
+        ) : null}
+
+        {errorMsg ? (
+          <div role="alert" style={{ fontSize: 12, color: '#DC2626', marginTop: 4 }}>
+            {errorMsg}
           </div>
         ) : null}
 
         {analysis.actions && analysis.actions.length > 0 ? (
-          <>
-            <div className="ai-chips-list">
-              {analysis.actions.map((act, idx) => {
-                const isSelected = selectedActions.includes(act);
-                return (
-                  <div
-                    key={idx}
-                    className={`ai-chip-item ${!isSelected ? 'deselected' : ''}`}
-                    onClick={() => toggleAction(act)}
-                  >
-                    <input
-                      type="checkbox"
-                      className="ai-chip-checkbox"
-                      checked={isSelected}
-                      onChange={() => {}}
-                      aria-label={`Select ${act.title}`}
-                    />
-                    <span className="ai-chip-icon">{renderActionIcon(act.type)}</span>
-                    <span className="ai-chip-title">
-                      {act.title}
-                      {act.quantity ? ` (${act.quantity})` : ''}
-                      {act.amount ? ` (₹${act.amount})` : ''}
-                    </span>
-                    <span className="ai-chip-tag">{act.type}</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            <button
-              type="button"
-              className="ai-apply-btn"
-              disabled={selectedActions.length === 0 || applying}
-              onClick={apply}
-            >
-              {applying ? (
-                <Spinner size={13} />
-              ) : (
-                <span>
-                  + {t('chat.ai_add_btn')} ({selectedActions.length})
-                </span>
-              )}
-            </button>
-          </>
+          <AiActionsList
+            actions={analysis.actions}
+            selected={selectedActions}
+            onToggle={toggleAction}
+            onApply={apply}
+            applying={applying}
+            applied={state === 'applied'}
+            lang={lang}
+          />
         ) : (
           <div className="ai-summary-text">
             {t('chat.ai_no_actions')}

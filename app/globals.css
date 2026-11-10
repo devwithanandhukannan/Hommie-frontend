@@ -2734,19 +2734,20 @@ html[data-theme='light'] .toast {
 
 .ai-action-card {
   margin-top: 8px;
-  padding: 10px 12px;
-  border-radius: 14px;
+  padding: 12px 14px;
+  border-radius: 16px;
   background: var(--surface-2);
-  border: 1px solid rgba(13, 71, 52, 0.2);
+  border: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-width: 320px;
+  gap: 10px;
+  width: 100%;
+  max-width: 390px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 [data-theme='dark'] .ai-action-card {
   background: #242426;
-  border-color: rgba(52, 211, 153, 0.25);
+  border-color: var(--line);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
 }
 
@@ -2763,11 +2764,11 @@ html[data-theme='light'] .toast {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.03em;
-  color: var(--brand);
+  color: var(--text);
   text-transform: uppercase;
 }
 [data-theme='dark'] .ai-card-badge {
-  color: #34D399;
+  color: var(--text);
 }
 .ai-card-close {
   background: transparent;
@@ -2776,8 +2777,8 @@ html[data-theme='light'] .toast {
   cursor: pointer;
   font-size: 14px;
   line-height: 1;
-  padding: 2px 4px;
-  border-radius: 4px;
+  padding: 4px;
+  border-radius: 6px;
 }
 .ai-card-close:hover {
   background: var(--line);
@@ -2790,12 +2791,12 @@ html[data-theme='light'] .toast {
   line-height: 1.5;
   padding: 9px 12px;
   border-radius: 12px;
-  background: var(--surface-2);
-  border-left: 3px solid var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
 }
 [data-theme='dark'] .ai-transcription-box {
-  background: var(--surface-2);
-  border-left-color: var(--muted);
+  background: var(--surface);
+  border-color: var(--line);
 }
 
 .ai-reply-card {
@@ -2811,6 +2812,20 @@ html[data-theme='light'] .toast {
   font-size: 13.5px;
   color: var(--text);
   line-height: 1.55;
+}
+
+.ai-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ai-group-head {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 2px 2px 0;
 }
 
 .ai-chips-list {
@@ -2829,14 +2844,16 @@ html[data-theme='light'] .toast {
   border: 1px solid var(--line);
   font-size: 13.5px;
   cursor: pointer;
-  transition: all 0.12s ease;
+  transition: border-color 0.12s ease, opacity 0.12s ease;
   user-select: none;
 }
 .ai-chip-item:hover {
   border-color: var(--brand);
 }
 .ai-chip-item.deselected {
-  opacity: 0.45;
+  opacity: 0.48;
+}
+.ai-chip-item.deselected .ai-chip-title {
   text-decoration: line-through;
 }
 .ai-chip-checkbox {
@@ -2844,27 +2861,74 @@ html[data-theme='light'] .toast {
   height: 16px;
   accent-color: var(--brand);
   cursor: pointer;
+  flex-shrink: 0;
 }
 .ai-chip-icon {
   font-size: 14px;
   flex-shrink: 0;
   color: var(--muted);
 }
-.ai-chip-title {
+.ai-chip-main {
   flex: 1;
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ai-chip-title {
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.ai-chip-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.3;
 }
 .ai-chip-tag {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   padding: 3px 9px;
   border-radius: 999px;
   background: var(--surface-2);
   color: var(--text);
   flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.ai-saved-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ai-saved-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ai-saved-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 0.14s ease, border-color 0.14s ease;
+}
+.ai-saved-link:hover {
+  background: var(--surface-2);
+  border-color: var(--brand);
+}
+.ai-saved-link:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 [data-theme='dark'] .ai-chip-tag {
   background: rgba(255, 255, 255, 0.1);
@@ -4264,7 +4328,7 @@ html[data-theme='dark'] .main.main-chat {
 .main.main-chat .ai-transcription-box {
   background: var(--chat-surface);
   color: var(--chat-bubble-them-text);
-  border-left-color: var(--chat-accent);
+  border: 1px solid var(--chat-line);
 }
 .main.main-chat .agentic-bubble.user {
   background: var(--chat-bubble-me);

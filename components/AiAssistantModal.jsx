@@ -4,9 +4,10 @@ import { useRouter } from 'next/navigation';
 import { useAuth, notifyChanged } from '@/lib/auth';
 import { post, upload } from '@/lib/api';
 import { useVoiceInput } from '@/lib/useVoiceInput';
-import { sanitizeAiActions, actionIconName } from '@/lib/aiActions';
+import { sanitizeAiActions } from '@/lib/aiActions';
+import AiActionsList from '@/components/AiActionsList';
 import { Sheet, Btn, Icon, Spinner, formatErrorMessage } from '@/components/ui';
-import StepTimeline, { AiReplyBody, parseAiReply } from '@/components/StepTimeline';
+import { AiReplyBody, parseAiReply } from '@/components/StepTimeline';
 
 export default function AiAssistantModal({ onClose, onDone }) {
   const { lang, reloadFamily } = useAuth();
@@ -113,24 +114,12 @@ export default function AiAssistantModal({ onClose, onDone }) {
     return `${m}:${r < 10 ? '0' : ''}${r}`;
   };
 
-  const renderActionIcon = (type) => <Icon name={actionIconName(type)} size={16} />;
-
-  // Group actions by kind and shop
   const recipeActions = (analysis?.actions || []).filter((a) => a.type?.includes('recipe'));
-  const mealActions = (analysis?.actions || []).filter((a) => a.type?.includes('meal'));
-  const calendarActions = (analysis?.actions || []).filter((a) => a.type?.includes('calendar'));
   const groceryActions = (analysis?.actions || []).filter((a) => a.type?.includes('grocery'));
-  const otherActions = (analysis?.actions || []).filter(
-    (a) => !a.type?.includes('recipe') && !a.type?.includes('meal') && !a.type?.includes('calendar') && !a.type?.includes('grocery')
+  const hasInlineSteps = Boolean(
+    analysis?.summary &&
+      parseAiReply(analysis.summary, { hasRecipeAction: recipeActions.length > 0 }).some((b) => b.type === 'steps')
   );
-
-  // Group groceries by shop
-  const groceriesByShop = {};
-  for (const g of groceryActions) {
-    const shop = g.shop || (lang === 'ml' ? 'പലചരക്ക് കട' : 'Supermarket / Grocery');
-    if (!groceriesByShop[shop]) groceriesByShop[shop] = [];
-    groceriesByShop[shop].push(g);
-  }
 
   const displayedError = errorMsg || voice.error;
   const voiceBadge = voice.voiceLocale === 'ml-IN' ? 'ML' : 'EN';
@@ -282,215 +271,33 @@ export default function AiAssistantModal({ onClose, onDone }) {
             ) : null}
 
             <div>
-              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 10, letterSpacing: '0.04em' }}>
-                {lang === 'ml' ? 'കണ്ടെത്തിയവ (ആവശ്യമുള്ളവ തിരഞ്ഞെടുക്കാം):' : 'Detected items (select to add):'}
-              </div>
-
               {analysis.actions && analysis.actions.length > 0 ? (
-                <div className="col" style={{ gap: 12 }}>
-                  {/* Recipe & Meal Schedule Cards */}
-                  {(recipeActions.length > 0 || mealActions.length > 0 || calendarActions.length > 0) && (
-                    <div className="col" style={{ gap: 8 }}>
-                      {recipeActions.map((act, idx) => {
-                        const isSelected = selectedActions.includes(act);
-                        const hasInlineSteps = Boolean(
-                          analysis.summary &&
-                            parseAiReply(analysis.summary, { hasRecipeAction: true }).some((b) => b.type === 'steps')
-                        );
-                        return (
-                          <div key={`recipe-${idx}`} className="col" style={{ gap: 6 }}>
-                            <div
-                              className={`ai-chip-item ${!isSelected ? 'deselected' : ''}`}
-                              onClick={() => toggleAction(act)}
-                            >
-                              <input
-                                type="checkbox"
-                                className="ai-chip-checkbox"
-                                checked={isSelected}
-                                onChange={() => {}}
-                                aria-label={act.title}
-                              />
-                              <span className="ai-chip-icon">{renderActionIcon('recipe')}</span>
-                              <span className="ai-chip-title" style={{ fontWeight: 600 }}>
-                                {act.title}
-                                {act.ingredients?.length || act.steps?.length ? (
-                                  <span className="small muted" style={{ fontWeight: 400, marginLeft: 6 }}>
-                                    {[
-                                      act.ingredients?.length ? `${act.ingredients.length} ${lang === 'ml' ? 'ചേരുവകൾ' : 'ingredients'}` : '',
-                                      act.steps?.length ? `${act.steps.length} ${lang === 'ml' ? 'ഘട്ടങ്ങൾ' : 'steps'}` : '',
-                                    ].filter(Boolean).join(' · ')}
-                                  </span>
-                                ) : null}
-                              </span>
-                              <span className="ai-chip-tag">
-                                {lang === 'ml' ? 'പാചകക്കുറിപ്പ്' : 'Recipe'}
-                              </span>
-                            </div>
-                            {!hasInlineSteps && act.steps?.length ? (
-                              <div className="ai-act-steps-box">
-                                <StepTimeline steps={act.steps} title={lang === 'ml' ? 'തയ്യാറാക്കുന്ന വിധം' : 'Steps'} estimate />
-                              </div>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-
-                      {mealActions.map((act, idx) => {
-                        const isSelected = selectedActions.includes(act);
-                        return (
-                          <div
-                            key={`meal-${idx}`}
-                            className={`ai-chip-item ${!isSelected ? 'deselected' : ''}`}
-                            onClick={() => toggleAction(act)}
-                          >
-                            <input
-                              type="checkbox"
-                              className="ai-chip-checkbox"
-                              checked={isSelected}
-                              onChange={() => {}}
-                              aria-label={act.title}
-                            />
-                            <span className="ai-chip-icon">{renderActionIcon('meal')}</span>
-                            <span className="ai-chip-title">
-                              {act.title} {act.date ? `· ${act.date}` : ''} {act.slot ? `(${act.slot})` : ''}
-                              {act.cookName ? ` · Cook: ${act.cookName}` : ''}
-                            </span>
-                            <span className="ai-chip-tag">
-                              {lang === 'ml' ? 'ഭക്ഷണ പ്ലാൻ' : 'Meal'}
-                            </span>
-                          </div>
-                        );
-                      })}
-
-                      {calendarActions.map((act, idx) => {
-                        const isSelected = selectedActions.includes(act);
-                        return (
-                          <div
-                            key={`cal-${idx}`}
-                            className={`ai-chip-item ${!isSelected ? 'deselected' : ''}`}
-                            onClick={() => toggleAction(act)}
-                          >
-                            <input
-                              type="checkbox"
-                              className="ai-chip-checkbox"
-                              checked={isSelected}
-                              onChange={() => {}}
-                              aria-label={act.title}
-                            />
-                            <span className="ai-chip-icon">{renderActionIcon('calendar')}</span>
-                            <span className="ai-chip-title">
-                              {act.title} {act.dueDate ? `· ${act.dueDate}` : ''}
-                              {act.assigneeName ? ` · ${act.assigneeName}` : ''}
-                            </span>
-                            <span className="ai-chip-tag">
-                              {lang === 'ml' ? 'കലണ്ടർ' : 'Calendar'}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Groceries Grouped by Shop */}
-                  {Object.entries(groceriesByShop).map(([shopName, items]) => (
-                    <div key={shopName} className="col" style={{ gap: 6 }}>
-                      <div className="row" style={{ gap: 6, alignItems: 'center', marginTop: 4 }}>
-                        <Icon name="store" size={14} />
-                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)' }}>
-                          {shopName}
-                        </span>
-                      </div>
-                      <div className="col" style={{ gap: 6 }}>
-                        {items.map((act, idx) => {
-                          const isSelected = selectedActions.includes(act);
-                          return (
-                            <div
-                              key={idx}
-                              className={`ai-chip-item ${!isSelected ? 'deselected' : ''}`}
-                              onClick={() => toggleAction(act)}
-                            >
-                              <input
-                                type="checkbox"
-                                className="ai-chip-checkbox"
-                                checked={isSelected}
-                                onChange={() => {}}
-                                aria-label={act.title}
-                              />
-                              <span className="ai-chip-icon">{renderActionIcon('grocery')}</span>
-                              <span className="ai-chip-title">
-                                {act.title}
-                                {act.quantity ? ` (${act.quantity})` : ''}
-                              </span>
-                              {act.category ? (
-                                <span className="ai-chip-tag">{act.category}</span>
-                              ) : null}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Other Actions (Tasks, Expenses, Bills) */}
-                  {otherActions.length > 0 && (
-                    <div className="col" style={{ gap: 6, marginTop: 4 }}>
-                      {otherActions.map((act, idx) => {
-                        const isSelected = selectedActions.includes(act);
-                        return (
-                          <div
-                            key={idx}
-                            className={`ai-chip-item ${!isSelected ? 'deselected' : ''}`}
-                            onClick={() => toggleAction(act)}
-                          >
-                            <input
-                              type="checkbox"
-                              className="ai-chip-checkbox"
-                              checked={isSelected}
-                              onChange={() => {}}
-                              aria-label={act.title}
-                            />
-                            <span className="ai-chip-icon">{renderActionIcon(act.type)}</span>
-                            <span className="ai-chip-title">
-                              {act.title}
-                              {act.amount ? ` (₹${act.amount})` : ''}
-                            </span>
-                            <span className="ai-chip-tag">{act.type}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                <AiActionsList
+                  actions={analysis.actions}
+                  selected={selectedActions}
+                  onToggle={toggleAction}
+                  onApply={applyActions}
+                  applying={applying}
+                  applied={false}
+                  lang={lang}
+                  hasInlineSteps={hasInlineSteps}
+                  onNavigate={onClose}
+                  secondaryAction={
+                    <Btn tone="ghost" onClick={() => setStep('idle')}>
+                      {lang === 'ml' ? 'വീണ്ടും പറയാം' : 'Try again'}
+                    </Btn>
+                  }
+                />
               ) : (
-                <div className="muted small" style={{ padding: '8px 0' }}>
-                  {lang === 'ml' ? 'പ്രത്യേക ടാസ്കുകൾ ഒന്നും കണ്ടെത്തിയില്ല.' : 'No specific tasks or items found.'}
+                <div className="col" style={{ gap: 10 }}>
+                  <div className="muted small" style={{ padding: '4px 0' }}>
+                    {lang === 'ml' ? 'പ്രത്യേക ടാസ്കുകൾ ഒന്നും കണ്ടെത്തിയില്ല.' : 'No specific tasks or items found.'}
+                  </div>
+                  <Btn tone="ghost" onClick={() => setStep('idle')}>
+                    {lang === 'ml' ? 'വീണ്ടും പറയാം' : 'Try again'}
+                  </Btn>
                 </div>
               )}
-            </div>
-
-            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-              <Btn tone="ghost" className="grow" onClick={() => setStep('idle')}>
-                {lang === 'ml' ? 'വീണ്ടും പറയാം' : 'Try again'}
-              </Btn>
-              <Btn
-                className="grow"
-                disabled={selectedActions.length === 0 || applying}
-                onClick={applyActions}
-                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-              >
-                {applying ? (
-                  <Spinner size={14} />
-                ) : (
-                  <>
-                    <Icon name="check" size={15} />
-                    <span>
-                      {lang === 'ml'
-                        ? `${selectedActions.length} എണ്ണം ചേർക്കുക`
-                        : `Add ${selectedActions.length} item${selectedActions.length === 1 ? '' : 's'}`}
-                    </span>
-                  </>
-                )}
-              </Btn>
             </div>
           </div>
         ) : null}
