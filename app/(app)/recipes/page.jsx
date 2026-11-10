@@ -25,8 +25,8 @@ function RecipeForm({ onClose, onDone }) {
     const lines = (text) => text.split('\n').map((x) => x.trim()).filter(Boolean);
     const body = {
       title: f.title.trim(),
-      ingredients: lines(f.ingredients).slice(0, 60).map((l) => { const [name, ...q] = l.split(' - '); return { name: name.trim().slice(0, 80), qty: q.join(' - ').trim().slice(0, 30) }; }),
-      steps: lines(f.steps).slice(0, 40), tags: f.tags.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 8),
+      ingredients: lines(f.ingredients).slice(0, 60).map((l) => { const [name, ...q] = l.split(' - '); return { name: name.trim().slice(0, 120), qty: q.join(' - ').trim().slice(0, 60) }; }),
+      steps: lines(f.steps).slice(0, 60).map((s) => s.slice(0, 1000)), tags: f.tags.split(',').map((x) => x.trim().slice(0, 50)).filter(Boolean).slice(0, 10),
     };
     const ok = await run(async () => {
       if (file) { const fd = new FormData(); fd.append('file', file); body.photoId = (await upload('/attachments', fd)).id; }
@@ -37,7 +37,7 @@ function RecipeForm({ onClose, onDone }) {
   return (
     <Sheet title={t('recipes.share_btn')} onClose={onClose}>
       <form className="col" onSubmit={save}>
-        <Field label={t('recipes.field_name')}>{(id) => <Input id={id} required maxLength={100} value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />}</Field>
+        <Field label={t('recipes.field_name')}>{(id) => <Input id={id} required maxLength={140} value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />}</Field>
         <Field label={t('recipes.field_ingredients')} hint={t('recipes.ingredients_hint')}>{(id) => <textarea id={id} className="textarea" rows={5} value={f.ingredients} onChange={(e) => setF({ ...f, ingredients: e.target.value })} />}</Field>
         <Field label={t('recipes.field_steps')} hint={t('recipes.steps_hint')}>{(id) => <textarea id={id} className="textarea" rows={5} value={f.steps} onChange={(e) => setF({ ...f, steps: e.target.value })} />}</Field>
         <Field label={t('recipes.field_tags')} hint="Comma separated">{(id) => <Input id={id} value={f.tags} onChange={(e) => setF({ ...f, tags: e.target.value })} placeholder="breakfast, quick" />}</Field>
