@@ -256,15 +256,7 @@ export default function AgenticChatPanel() {
   return (
     <div className="agentic-chat-panel">
       {/* Top Banner */}
-      <div className="agentic-header">
-        <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-          <Icon name="sparkles" size={20} />
-          <div>
-            <div className="bold" style={{ fontSize: 14 }}>Hommi AI Agent</div>
-            <div className="tiny muted">{lang === 'ml' ? 'വീട്ടുസഹായി · ചോദിക്കാം' : 'Household Assistant · Ask anything'}</div>
-          </div>
-        </div>
-      </div>
+      
 
       {/* Messages Scroll Area */}
       <div className="agentic-messages-list">
@@ -309,21 +301,28 @@ export default function AgenticChatPanel() {
                         );
                       }
                       if (b.type === 'ingredients') {
+                        const missingCount = b.items.filter((x) => x.missing).length;
                         return (
                           <div key={bi} className="ai-ing-wrap">
-                            <div className="agentic-sec-title">{b.title}</div>
+                            <div className="row between" style={{ gap: 8, alignItems: 'center' }}>
+                              <div className="agentic-sec-title">{b.title}</div>
+                              {missingCount > 0 ? (
+                                <span className="ai-ing-legend">
+                                  <span className="ai-ing-dot is-missing" aria-hidden="true" />
+                                  <span>{lang === 'ml' ? `${missingCount} അടുക്കളയിൽ ഇല്ല` : `${missingCount} not in kitchen`}</span>
+                                </span>
+                              ) : null}
+                            </div>
                             <div className="ai-ing-list">
                               {b.items.map((ing, ii) => (
                                 <div key={ii} className={`ai-ing-row ${ing.inKitchen ? 'in-stock' : ing.missing ? 'missing' : ''}`}>
+                                  <span className={`ai-ing-dot ${ing.missing ? 'is-missing' : ing.inKitchen ? 'is-ok' : ''}`} aria-hidden="true" />
                                   <span className="ai-ing-name">{ing.name}</span>
-                                  <span className="ai-ing-right">
-                                    {ing.qty ? <span className="ai-ing-qty">{ing.qty}</span> : null}
-                                    {ing.inKitchen ? (
-                                      <span className="ai-ing-badge">{lang === 'ml' ? 'അടുക്കളയിൽ ഉണ്ട്' : 'In kitchen'}</span>
-                                    ) : ing.missing ? (
-                                      <span className="ai-ing-badge is-missing">{lang === 'ml' ? 'ഇല്ല' : 'Not in kitchen'}</span>
-                                    ) : null}
-                                  </span>
+                                  {ing.qty || ing.inKitchen ? (
+                                    <span className="ai-ing-qty">
+                                      {[ing.qty, ing.inKitchen ? (lang === 'ml' ? 'ഉണ്ട്' : 'in kitchen') : ''].filter(Boolean).join(' · ')}
+                                    </span>
+                                  ) : null}
                                 </div>
                               ))}
                             </div>

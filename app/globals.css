@@ -4271,6 +4271,8 @@ html[data-theme='dark'] .main.main-chat {
   background: var(--chat-bubble-them);
   color: var(--chat-bubble-them-text);
   border: 0;
+  padding: 16px 20px;
+  border-radius: 22px;
 }
 .main.main-chat .agentic-action-card {
   background: var(--chat-surface-2);
@@ -4301,71 +4303,72 @@ html[data-theme='dark'] .main.main-chat {
 }
 
 /* AI Structured Recipe & Step Timeline */
-.agentic-rich { display: flex; flex-direction: column; gap: 10px; }
-.agentic-p { line-height: 1.5; white-space: pre-wrap; }
+.agentic-rich { display: flex; flex-direction: column; gap: 14px; }
+.agentic-p { line-height: 1.55; white-space: pre-wrap; }
 .agentic-sec-title {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--muted);
-  margin-top: 2px;
 }
-.agentic-bullets { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; line-height: 1.45; }
+.agentic-bullets { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; line-height: 1.5; }
 
-.ai-ing-wrap { display: flex; flex-direction: column; gap: 6px; }
+.ai-ing-wrap { display: flex; flex-direction: column; gap: 8px; }
+.ai-ing-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #C94A3F;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .ai-ing-legend { color: #EA867C; }
+}
+html[data-theme='dark'] .ai-ing-legend { color: #EA867C; }
+
 .ai-ing-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 4px 22px;
 }
-.ai-ing-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 7px 10px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--text) 4%, transparent);
-  border: 0;
-  font-size: 13px;
-}
+.ai-ing-row,
 .main.main-chat .ai-ing-row {
-  background: color-mix(in srgb, var(--text) 4.5%, transparent);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 4px;
+  border-radius: 8px;
+  background: transparent;
+  border: 0;
+  font-size: 13.5px;
+  line-height: 1.4;
 }
-.ai-ing-row.in-stock { opacity: 0.78; }
-.ai-ing-row.missing,
-.main.main-chat .ai-ing-row.missing {
-  background: color-mix(in srgb, #FF5A52 11%, transparent);
+.ai-ing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+  align-self: center;
+  background: color-mix(in srgb, var(--text) 28%, transparent);
 }
-.ai-ing-row.missing .ai-ing-name {
-  color: #D92D20;
-}
+.ai-ing-dot.is-ok { background: color-mix(in srgb, var(--text) 24%, transparent); }
+.ai-ing-dot.is-missing { background: #D9483B; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .ai-ing-row.missing .ai-ing-name { color: #FF7B74; }
+  :root:not([data-theme='light']) .ai-ing-dot.is-missing { background: #F0796F; }
 }
-html[data-theme='dark'] .ai-ing-row.missing .ai-ing-name { color: #FF7B74; }
+html[data-theme='dark'] .ai-ing-dot.is-missing { background: #F0796F; }
 
-.ai-ing-name { font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
-.ai-ing-right { display: inline-flex; align-items: center; gap: 6px; flex: none; }
-.ai-ing-qty { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
-.ai-ing-badge {
-  font-size: 10.5px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--text) 8%, transparent);
-  color: var(--muted);
-  white-space: nowrap;
-}
-.ai-ing-badge.is-missing {
-  background: color-mix(in srgb, #FF5A52 18%, transparent);
-  color: #D92D20;
-}
+.ai-ing-row.in-stock { opacity: 0.65; }
+.ai-ing-row.missing,
+.main.main-chat .ai-ing-row.missing { background: transparent; }
+.ai-ing-row.missing .ai-ing-name { color: #C94A3F; font-weight: 500; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .ai-ing-badge.is-missing { color: #FF7B74; }
+  :root:not([data-theme='light']) .ai-ing-row.missing .ai-ing-name { color: #F28B82; }
 }
-html[data-theme='dark'] .ai-ing-badge.is-missing { color: #FF7B74; }
+html[data-theme='dark'] .ai-ing-row.missing .ai-ing-name { color: #F28B82; }
+
+.ai-ing-name { font-weight: 500; min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.ai-ing-qty { font-size: 12.5px; font-weight: 500; color: var(--muted); white-space: nowrap; flex: none; }
 .ai-act-steps-box {
   padding: 8px 10px;
   border-radius: 10px;
@@ -4403,20 +4406,16 @@ html[data-theme='dark'] .ai-ing-badge.is-missing { color: #FF7B74; }
   background: var(--muted);
 }
 .step-tl-title {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--muted);
 }
 .step-tl-summary {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 500;
   color: var(--muted);
   margin-left: auto;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--text) 7%, transparent);
+  font-variant-numeric: tabular-nums;
 }
 .step-tl-list { position: relative; margin-top: 2px; }
 .step-tl-curve {
@@ -4480,22 +4479,22 @@ html[data-theme='dark'] .ai-ing-badge.is-missing { color: #FF7B74; }
   position: absolute;
   left: 14px;
   top: 17px;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  background: color-mix(in srgb, var(--text) 10%, var(--surface));
+  background: var(--surface);
   border: 0;
   color: var(--muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   z-index: 2;
   transition: all 0.16s ease;
 }
-.main.main-chat .step-tl-node { background: color-mix(in srgb, var(--text) 12%, var(--chat-bubble-them)); }
+.main.main-chat .step-tl-node { background: var(--chat-bubble-them); }
 .step-tl-item:hover .step-tl-node,
 .step-tl-pill:focus-visible .step-tl-node {
   color: var(--on-brand);
@@ -4522,17 +4521,16 @@ html[data-theme='dark'] .ai-ing-badge.is-missing { color: #FF7B74; }
 
 .step-tl-time {
   flex: none;
-  font-size: 11.5px;
-  font-weight: 600;
-  padding: 3px 9px;
-  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  background: color-mix(in srgb, var(--brand) 13%, transparent);
-  color: var(--text);
+  padding: 0;
+  background: transparent;
   border: 0;
-  margin-top: 1px;
+  margin-top: 2px;
 }
 .step-tl-time.is-est {
-  background: color-mix(in srgb, var(--text) 7%, transparent);
-  color: var(--muted);
+  opacity: 0.78;
 }

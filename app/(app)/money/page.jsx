@@ -57,7 +57,7 @@ function ExpenseSheet({ expense = null, onClose, onDone }) {
     if (isEdit) {
       const body = { amount, category: f.category, date: f.date, note: f.note.trim() };
       const updated = await run(() => patch(`/expenses/${expense.id}`, body), 'Updated');
-      if (updated) { onDone({ updated }); notifyChanged(); onClose(); }
+      if (updated) { onDone({ updated, prev: expense }); notifyChanged(); onClose(); }
       return;
     }
     if (!f.among.length) return;
@@ -69,7 +69,7 @@ function ExpenseSheet({ expense = null, onClose, onDone }) {
 
   const remove = async () => {
     if (!expense || !(await confirm('Delete this expense?'))) return;
-    if (await run(() => del(`/expenses/${expense.id}`), 'Deleted')) { onDone({ deletedId: expense.id }); notifyChanged(); onClose(); }
+    if (await run(() => del(`/expenses/${expense.id}`), 'Deleted')) { onDone({ deletedId: expense.id, prev: expense }); notifyChanged(); onClose(); }
   };
 
   return (
@@ -203,6 +203,31 @@ function GroceryBillSheet({ items, onClose, onDone }) {
   );
 }
 
+function patchMonthlyReport(prev, month, oldExp, newExp) {
+  if (!prev) return prev;
+  const inOld = oldExp && oldExp.date?.slice(0, 7) === month ? oldExp : null;
+  const inNew = newExp && newExp.date?.slice(0, 7) === month ? newExp : null;
+  if (!inOld && !inNew) return prev;
+  const cats = new Map((prev.byCategory || []).map((c) => [c.category, c.total]));
+  let total = prev.total || 0;
+  if (inOld) {
+    total = Math.max(0, total - inOld.amount);
+    const next = (cats.get(inOld.category) || 0) - inOld.amount;
+    if (next > 0) cats.set(inOld.category, next); else cats.delete(inOld.category);
+  }
+  if (inNew) {
+    total += inNew.amount;
+    cats.set(inNew.category, (cats.get(inNew.category) || 0) + inNew.amount);
+  }
+  const lastTotal = prev.vsLastMonth?.lastTotal || 0;
+  return {
+    ...prev,
+    total,
+    byCategory: [...cats].map(([category, tot]) => ({ category, total: tot })).sort((a, b) => b.total - a.total),
+    vsLastMonth: { lastTotal, changePercent: lastTotal ? Math.round(((total - lastTotal) / lastTotal) * 100) : null },
+  };
+}
+
 function Expenses({ unbilled = [], onBilled }) {
   const { t, lang } = useAuth();
   const [month, setMonth] = useState(thisMonth());
@@ -213,15 +238,20 @@ function Expenses({ unbilled = [], onBilled }) {
   const [billOpen, setBillOpen] = useState(false);
   const applyChange = (chg) => {
     if (chg?.updated?.id) {
+      const oldItem = chg.prev || list.data?.find((x) => x.id === chg.updated.id) || null;
       list.setData((prev) => {
         if (!prev) return prev;
         if (chg.updated.date?.slice(0, 7) !== month) return prev.filter((x) => x.id !== chg.updated.id);
         return prev.map((x) => (x.id === chg.updated.id ? chg.updated : x));
       });
+      rep.setData((prev) => patchMonthlyReport(prev, month, oldItem, chg.updated));
     } else if (chg?.created?.id && chg.created.date?.slice(0, 7) === month) {
       list.setData((prev) => (prev ? [chg.created, ...prev] : [chg.created]));
+      rep.setData((prev) => patchMonthlyReport(prev, month, null, chg.created));
     } else if (chg?.deletedId) {
+      const oldItem = chg.prev || list.data?.find((x) => x.id === chg.deletedId) || null;
       list.setData((prev) => (prev ? prev.filter((x) => x.id !== chg.deletedId) : prev));
+      rep.setData((prev) => patchMonthlyReport(prev, month, oldItem, null));
     }
     if (chg?.billedIds?.length) onBilled?.(chg.billedIds);
     if (typeof document === 'undefined' || document.visibilityState !== 'visible') {

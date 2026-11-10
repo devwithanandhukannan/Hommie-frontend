@@ -111,11 +111,11 @@ export function parseAiReply(text, { hasRecipeAction = false, missingNames = [] 
         const withoutNote = clean
           .replace(/\s*\((?:already available|in (?:your )?kitchen|in stock|available|not in (?:your )?kitchen|need to buy|missing|to buy|അടുക്കളയിലുള്ളത്|അടുക്കളയിൽ ഉണ്ട്|സ്റ്റോക്കിലുണ്ട്|കയ്യിലുള്ളത്|അടുക്കളയിൽ ഇല്ല|വാങ്ങാനുള്ളത്)[^)]*\)/gi, '')
           .trim();
-        const colonIdx = withoutNote.indexOf(':');
-        if (colonIdx > 0 && colonIdx < 60) {
+        const sepMatch = withoutNote.match(/^(.*?)\s*(?::|\s[-–—]\s)\s*(.+)$/);
+        if (sepMatch && sepMatch[1].trim().length > 0 && sepMatch[1].trim().length < 60) {
           return {
-            name: withoutNote.slice(0, colonIdx).trim(),
-            qty: withoutNote.slice(colonIdx + 1).trim(),
+            name: sepMatch[1].trim(),
+            qty: sepMatch[2].trim(),
             inKitchen,
             explicitMissing,
           };
@@ -207,8 +207,14 @@ export default function StepTimeline({ steps = [], title = 'Steps', estimate = t
   const [done, setDone] = useState(() => new Set());
   if (!Array.isArray(steps) || !steps.length) return null;
 
+  const cleanStepText = (raw) =>
+    String(raw || '')
+      .replace(/^\d+[.)]\s+/, '')
+      .replace(/\s*\((?:~|approx\.?\s*)?\d+(?:\.\d+)?(?:\s*(?:-|to|–)\s*\d+(?:\.\d+)?)?\s*(?:hours?|hrs?|h|minutes?|mins?|min|seconds?|secs?|മണിക്കൂർ|മിനിറ്റ്)\)(\.?)$/i, '$1')
+      .trim();
+
   const parsed = steps.map((stepText) => ({
-    text: String(stepText || '').replace(/^\d+[.)]\s+/, '').trim(),
+    text: cleanStepText(stepText),
     duration: extractStepDuration(stepText, { estimate }),
   }));
 

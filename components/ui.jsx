@@ -125,7 +125,17 @@ export function Sheet({ title, onClose, children }) {
     const prev = document.activeElement;
     const onKey = (e) => { if (e.key === 'Escape') onCloseRef.current(); };
     document.addEventListener('keydown', onKey);
-    ref.current?.querySelector('form input:not([type="hidden"]), form select, form textarea, input, select, textarea, button')?.focus();
+    const focusTarget = [
+      'form input:not([type="hidden"]):not([disabled])',
+      'form select:not([disabled])',
+      'form textarea:not([disabled])',
+      'input:not([type="hidden"]):not([disabled])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+      'button:not(.icon-btn):not([disabled])',
+      'button:not([disabled])',
+    ].map((sel) => ref.current?.querySelector(sel)).find(Boolean);
+    focusTarget?.focus();
     return () => { document.removeEventListener('keydown', onKey); prev?.focus?.(); };
   }, []);
   return (

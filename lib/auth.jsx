@@ -58,8 +58,12 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     setSessionLostHandler(() => { setUser(null); setFamily(null); setFamilies([]); setStatus('anon'); });
     boot();
-    if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    if ('serviceWorker' in navigator) {
+      if (process.env.NODE_ENV === 'production') {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      } else {
+        navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister())).catch(() => {});
+      }
     }
   }, [boot]);
 
