@@ -1,42 +1,92 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
-import { useAuth } from '@/lib/auth';
+import { useState, useRef, useEffect, useId, useCallback } from 'react';
+import { useAuth, notifyChanged } from '@/lib/auth';
 import { post, upload } from '@/lib/api';
-import { Icon, Spinner } from '@/components/ui';
+import { useVoiceInput } from '@/lib/useVoiceInput';
+import { sanitizeAiActions, actionIconName } from '@/lib/aiActions';
+import { Icon, Spinner, formatErrorMessage } from '@/components/ui';
 import StepTimeline, { InlineMarkdown, parseAiReply } from '@/components/StepTimeline';
 import { hhmm } from '@/lib/format';
 
+function buildWelcomeMessage(lang) {
+  return {
+    id: 'welcome',
+    role: 'assistant',
+    text:
+      lang === 'ml'
+        ? 'നമസ്കാരം! ഞാൻ നിങ്ങളുടെ Hommi AI സഹായിയാണ്. അടുക്കളയിലെ സാധനങ്ങൾ അറിയാനും, ബിരിയാണി പോലുള്ള വിഭവങ്ങൾക്കുള്ള ലിസ്റ്റ് തയ്യാറാക്കാനും, ജോലികൾ നൽകാനും, ഈ മാസത്തെ ചിലവ് കണക്കാക്കാനും എന്നോട് ചോദിക്കാം.'
+        : 'Hello! I am your Hommi AI assistant. Ask me what groceries to buy, ingredients needed for biriyani, pending chores, or this month’s family expenses.',
+    actions: [],
+    suggestedChips:
+      lang === 'ml'
+        ? ['എന്തൊക്കെ വാങ്ങാനുണ്ട്?', 'ബിരിയാണി ഉണ്ടാക്കാൻ എന്ത് വേണം?', 'ഈ മാസത്തെ ചിലവ് എത്ര?', 'ഇന്നത്തെ മരുന്നുകൾ']
+        : ['What to buy?', 'Make Biriyani (check kitchen)', 'Monthly expenses', 'Today’s medicines'],
+  };
+}
+
+function compactClientHistory(msgs) {
+  return msgs
+    .filter((m) => m.id !== 'welcome' && m.text)
+    .slice(-4)
+    .map((m) => ({
+      role: m.role,
+      content: String(m.text).slice(0, m.role === 'assistant' ? 350 : 500),
+    }));
+}
+
 export default function AgenticChatPanel() {
-  const { lang, reloadFamily } = useAuth();
-  const [messages, setMessages] = useState([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      text:
-        lang === 'ml'
-          ? 'നമസ്കാരം! ഞാൻ നിങ്ങളുടെ Hommi AI സഹായിയാണ്. അടുക്കളയിലെ സാധനങ്ങൾ അറിയാനും, ബിരിയാണി പോലുള്ള വിഭവങ്ങൾക്കുള്ള ലിസ്റ്റ് തയ്യാറാക്കാനും, ജോലികൾ നൽകാനും, ഈ മാസത്തെ ചിലവ് കണക്കാക്കാനും എന്നോട് ചോദിക്കാം.'
-          : 'Hello! I am your Hommi AI assistant. Ask me what groceries to buy, ingredients needed for biriyani, pending chores, or this month’s family expenses.',
-      actions: [],
-      timestamp: new Date().toISOString(),
-      suggestedChips:
-        lang === 'ml'
-          ? ['എന്തൊക്കെ വാങ്ങാനുണ്ട്?', 'ബിരിയാണി ഉണ്ടാക്കാൻ എന്ത് വേണം?', 'ഈ മാസത്തെ ചിലവ് എത്ര?', 'ഇന്നത്തെ മരുന്നുകൾ']
-          : ['What to buy?', 'Make Biriyani (check kitchen)', 'Monthly expenses', 'Today’s medicines'],
-    },
-  ]);
+  const { lang, familyId, reloadFamily } = useAuth();
+  const [messages, setMessages] = useState(() => [buildWelcomeMessage(lang)]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [applyingId, setApplyingId] = useState(null);
+  const [actionError, setActionError] = useState('');
 
-  // Voice recording state
-  const [isRecording, setIsRecording] = useState(false);
-  const [seconds, setSeconds] = useState(0);
-  const mediaRecorderRef = useRef(null);
-  const audioStreamRef = useRef(null);
-  const audioChunksRef = useRef([]);
-  const timerRef = useRef(null);
-
+  const inputId = useId();
+  const inputRef = useRef(null);
   const scrollRef = useRef(null);
+  const busyRef = useRef(false);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+
+  const storageKey = familyId ? `hommi_ai_chat_${familyId}` : null;
+
+  // Restore session conversation per family cleanly after mount (SSR hydration-safe)
+  useEffect(() => {
+    if (!storageKey) {
+      setMessages([buildWelcomeMessage(lang)]);
+      return;
+    }
+    try {
+      const raw = sessionStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+          return;
+        }
+      }
+    } catch {}
+    setMessages([buildWelcomeMessage(lang)]);
+  }, [storageKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update welcome copy on language switch if user hasn't started chatting yet
+  useEffect(() => {
+    setMessages((prev) => {
+      if (prev.length === 1 && prev[0]?.id === 'welcome') {
+        return [buildWelcomeMessage(lang)];
+      }
+      return prev;
+    });
+  }, [lang]);
+
+  // Persist last 30 turns in sessionStorage
+  useEffect(() => {
+    if (!storageKey || messages.length <= 1) return;
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-30)));
+    } catch {}
+  }, [messages, storageKey]);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'auto' });
@@ -44,156 +94,111 @@ export default function AgenticChatPanel() {
     return () => clearTimeout(t);
   }, [messages, busy]);
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (audioStreamRef.current) {
-        audioStreamRef.current.getTracks().forEach((t) => t.stop());
-      }
-    };
-  }, []);
+  const sendQuery = useCallback(async ({ text = '', audioFile = null, speechLang = '' } = {}) => {
+    if (busyRef.current) return;
+    const textToSend = (text || '').trim();
+    if (!textToSend && !audioFile) return;
 
-  const sendQuery = async (queryText, attachmentId = null) => {
-    const textToSend = (queryText || '').trim();
-    if (!textToSend && !attachmentId) return;
+    setActionError('');
+    busyRef.current = true;
+    setBusy(true);
 
     const userMsgId = String(Date.now());
     const userMsg = {
       id: userMsgId,
       role: 'user',
-      text: textToSend || (lang === 'ml' ? 'വോയ്സ് നോട്ട് അയച്ചു...' : 'Spoke voice message...'),
+      text: textToSend || (lang === 'ml' ? 'ശബ്ദ സന്ദേശം പ്രോസസ്സ് ചെയ്യുന്നു...' : 'Processing voice message...'),
       timestamp: new Date().toISOString(),
     };
 
+    const history = compactClientHistory(messagesRef.current);
     setMessages((prev) => [...prev, userMsg]);
-    setInput('');
-    setBusy(true);
+    if (textToSend) setInput('');
 
     try {
-      // Build history for context (last 6 messages)
-      const history = messages.slice(-6).map((m) => ({
-        role: m.role,
-        content: m.text,
-      }));
+      let res;
+      if (audioFile) {
+        const fd = new FormData();
+        fd.append('file', audioFile);
+        if (speechLang) fd.append('speechLang', speechLang);
+        if (history.length > 0) fd.append('history', JSON.stringify(history));
+        res = await upload('/ai/agent', fd);
+      } else {
+        const payload = { message: textToSend, history };
+        if (speechLang) payload.speechLang = speechLang;
+        res = await post('/ai/agent', payload);
+      }
 
-      const payload = { history };
-      if (textToSend) payload.message = textToSend;
-      if (attachmentId) payload.attachmentId = attachmentId;
-
-      const res = await post('/ai/agent', payload);
-
-      // If audio transcription returned, update user message text
-      if (res.transcription && attachmentId) {
+      if (audioFile && res?.transcription) {
         setMessages((prev) =>
           prev.map((m) => (m.id === userMsgId ? { ...m, text: `"${res.transcription}"` } : m))
         );
+      } else if (audioFile) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === userMsgId ? { ...m, text: lang === 'ml' ? 'ശബ്ദ സന്ദേശം' : 'Voice message' } : m))
+        );
       }
 
-      const assistantMsg = {
-        id: String(Date.now() + 1),
-        role: 'assistant',
-        text: res.reply || '',
-        actions: Array.isArray(res.actions) ? res.actions : [],
-        suggestedChips: Array.isArray(res.suggestedChips) ? res.suggestedChips : [],
-        selectedActions: Array.isArray(res.actions) ? [...res.actions] : [],
-        applied: false,
-        timestamp: new Date().toISOString(),
-      };
-
-      setMessages((prev) => [...prev, assistantMsg]);
-    } catch {
+      const actions = Array.isArray(res?.actions) ? res.actions : [];
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: String(Date.now() + 1),
+          role: 'assistant',
+          text: res?.reply || '',
+          actions,
+          suggestedChips: Array.isArray(res?.suggestedChips) ? res.suggestedChips : [],
+          selectedActions: [...actions],
+          applied: false,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    } catch (err) {
       const replyIsMl = /[\u0D00-\u0D7F]/.test(textToSend) || (lang === 'ml' && !textToSend);
+      const errText = formatErrorMessage(err);
       setMessages((prev) => [
         ...prev,
         {
           id: String(Date.now() + 2),
           role: 'assistant',
-          text: replyIsMl ? 'ക്ഷമിക്കണം, ബന്ധപ്പെടാൻ സാധിച്ചില്ല. ദയവായി വീണ്ടും ശ്രമിക്കുക.' : 'Sorry, could not process request. Please try again.',
+          text:
+            errText ||
+            (replyIsMl
+              ? 'ക്ഷമിക്കണം, ബന്ധപ്പെടാൻ സാധിച്ചില്ല. ദയവായി വീണ്ടും ശ്രമിക്കുക.'
+              : 'Sorry, could not process request. Please try again.'),
           timestamp: new Date().toISOString(),
         },
       ]);
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
-  };
+  }, [lang]);
 
-  const startVoice = async () => {
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) return;
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioStreamRef.current = stream;
-
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm')
-        ? 'audio/webm'
-        : MediaRecorder.isTypeSupported('audio/mp4')
-        ? 'audio/mp4'
-        : '';
-      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-      mediaRecorderRef.current = recorder;
-      audioChunksRef.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-
-      recorder.start(100);
-      setIsRecording(true);
-      setSeconds(0);
-
-      timerRef.current = setInterval(() => {
-        setSeconds((prev) => {
-          if (prev >= 29) {
-            stopAndSendVoice();
-            return 30;
-          }
-          return prev + 1;
-        });
-      }, 1000);
-    } catch {
-      alert('Microphone access denied or unavailable');
-    }
-  };
-
-  const stopAndSendVoice = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    const recorder = mediaRecorderRef.current;
-    if (!recorder || recorder.state === 'inactive') {
-      setIsRecording(false);
+  const handleVoiceResult = useCallback(({ transcript, audioFile, speechLang, action }) => {
+    if (transcript) {
+      if (action === 'edit') {
+        setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+        setTimeout(() => inputRef.current?.focus(), 0);
+        return;
+      }
+      sendQuery({ text: transcript, speechLang });
       return;
     }
-
-    recorder.onstop = async () => {
-      if (audioStreamRef.current) {
-        audioStreamRef.current.getTracks().forEach((t) => t.stop());
-      }
-      setIsRecording(false);
-      const mime = recorder.mimeType || 'audio/webm';
-      const blob = new Blob(audioChunksRef.current, { type: mime });
-      if (blob.size === 0) return;
-
-      try {
-        const ext = mime.includes('mp4') ? 'mp4' : 'webm';
-        const file = new File([blob], `agent-${Date.now()}.${ext}`, { type: mime });
-        const f = new FormData();
-        f.append('file', file);
-        const a = await upload('/attachments', f);
-        await sendQuery('', a.id);
-      } catch {}
-    };
-
-    recorder.stop();
-  };
-
-  const cancelVoice = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+    if (audioFile) {
+      sendQuery({ audioFile, speechLang });
     }
-    if (audioStreamRef.current) {
-      audioStreamRef.current.getTracks().forEach((t) => t.stop());
+  }, [sendQuery]);
+
+  const voice = useVoiceInput({ uiLang: lang, disabled: busy, onResult: handleVoiceResult });
+
+  const clearChat = () => {
+    if (busy) return;
+    if (storageKey) {
+      try { sessionStorage.removeItem(storageKey); } catch {}
     }
-    audioChunksRef.current = [];
-    setIsRecording(false);
+    setActionError('');
+    setMessages([buildWelcomeMessage(lang)]);
   };
 
   const toggleActionItem = (msgId, action) => {
@@ -210,53 +215,48 @@ export default function AgenticChatPanel() {
   };
 
   const executeActions = async (msgId, actionsToApply) => {
-    if (!actionsToApply || actionsToApply.length === 0) return;
+    if (!actionsToApply || actionsToApply.length === 0 || applyingId) return;
+    setActionError('');
     setApplyingId(msgId);
     try {
-      const sanitized = actionsToApply.map((a) => ({
-        type: a.type || 'grocery',
-        title: String(a.title || '').trim().slice(0, 140),
-        quantity: a.quantity ? String(a.quantity).slice(0, 60) : null,
-        category: a.category ? String(a.category).slice(0, 50) : null,
-        shop: a.shop ? String(a.shop).slice(0, 60) : null,
-        amount: typeof a.amount === 'number' && !isNaN(a.amount) ? a.amount : null,
-        dueDate: a.dueDate || undefined,
-        slot: a.slot || undefined,
-        date: a.date || undefined,
-        cookName: a.cookName || undefined,
-        assigneeName: a.assigneeName || undefined,
-        targetId: a.targetId || undefined,
-        ingredients: Array.isArray(a.ingredients) ? a.ingredients : undefined,
-        steps: Array.isArray(a.steps) ? a.steps : undefined,
-      }));
-
+      const sanitized = sanitizeAiActions(actionsToApply);
       await post('/ai/apply', { actions: sanitized, notifyInChat: true });
       setMessages((prev) =>
         prev.map((m) => (m.id === msgId ? { ...m, applied: true } : m))
       );
+      notifyChanged();
       reloadFamily().catch(() => {});
-    } catch {}
-    finally {
+    } catch (err) {
+      setActionError(
+        formatErrorMessage(err) ||
+          (lang === 'ml' ? 'ഇനങ്ങൾ ചേർക്കാൻ സാധിച്ചില്ല. വീണ്ടും ശ്രമിക്കുക.' : 'Failed to apply items. Please try again.')
+      );
+    } finally {
       setApplyingId(null);
     }
   };
 
-  const renderActionIcon = (type) => {
-    if (type?.includes('grocery')) return <Icon name="cart" size={16} />;
-    if (type?.includes('recipe')) return <Icon name="recipes" size={16} />;
-    if (type?.includes('meal')) return <Icon name="meals" size={16} />;
-    if (type?.includes('calendar')) return <Icon name="calendar" size={16} />;
-    if (type?.includes('task')) return <Icon name="tasks" size={16} />;
-    if (type?.includes('delete')) return <Icon name="trash" size={16} />;
-    if (type?.includes('expense')) return <Icon name="money" size={16} />;
-    if (type?.includes('medicine')) return <Icon name="med" size={16} />;
-    return <Icon name="tasks" size={16} />;
-  };
+  const activeError = actionError || voice.error;
+  const voiceBadge = voice.voiceLocale === 'ml-IN' ? 'ML' : 'EN';
+  const formatSecs = (s) => `00:${s < 10 ? `0${s}` : s}`;
 
   return (
     <div className="agentic-chat-panel">
-      {/* Top Banner */}
-      
+      {/* Compact Session Controls */}
+      {messages.length > 1 ? (
+        <div className="agentic-toolbar">
+          <button
+            type="button"
+            className="agentic-reset-btn"
+            onClick={clearChat}
+            disabled={busy}
+            aria-label={lang === 'ml' ? 'പുതിയ ചാറ്റ് തുടങ്ങുക' : 'Start a new conversation'}
+          >
+            <Icon name="plus" size={13} />
+            <span>{lang === 'ml' ? 'പുതിയ ചാറ്റ്' : 'New chat'}</span>
+          </button>
+        </div>
+      ) : null}
 
       {/* Messages Scroll Area */}
       <div className="agentic-messages-list">
@@ -270,7 +270,6 @@ export default function AgenticChatPanel() {
             (a) => !a.type?.includes('recipe') && !a.type?.includes('meal') && !a.type?.includes('calendar') && !a.type?.includes('grocery')
           );
 
-          // Group groceries by shop
           const groceriesByShop = {};
           for (const g of groceryActions) {
             const shop = g.shop || (lang === 'ml' ? 'പലചരക്ക് കട' : 'Supermarket / Grocery');
@@ -363,7 +362,6 @@ export default function AgenticChatPanel() {
 
                     {!m.applied ? (
                       <div className="col" style={{ gap: 10 }}>
-                        {/* Recipe, Meal, & Calendar Cards */}
                         {(recipeActions.length > 0 || mealActions.length > 0 || calendarActions.length > 0) && (
                           <div className="col" style={{ gap: 6 }}>
                             {recipeActions.map((act, idx) => {
@@ -381,7 +379,7 @@ export default function AgenticChatPanel() {
                                       onChange={() => {}}
                                       aria-label={act.title}
                                     />
-                                    <span className="ai-chip-icon">{renderActionIcon('recipe')}</span>
+                                    <span className="ai-chip-icon"><Icon name={actionIconName('recipe')} size={16} /></span>
                                     <span className="ai-chip-title" style={{ fontWeight: 600 }}>
                                       {act.title}
                                     </span>
@@ -416,7 +414,7 @@ export default function AgenticChatPanel() {
                                     onChange={() => {}}
                                     aria-label={act.title}
                                   />
-                                  <span className="ai-chip-icon">{renderActionIcon('meal')}</span>
+                                  <span className="ai-chip-icon"><Icon name={actionIconName('meal')} size={16} /></span>
                                   <span className="ai-chip-title">
                                     {act.title} {act.date ? `· ${act.date}` : ''} {act.slot ? `(${act.slot})` : ''}
                                     {act.cookName ? ` · Cook: ${act.cookName}` : ''}
@@ -443,7 +441,7 @@ export default function AgenticChatPanel() {
                                     onChange={() => {}}
                                     aria-label={act.title}
                                   />
-                                  <span className="ai-chip-icon">{renderActionIcon('calendar')}</span>
+                                  <span className="ai-chip-icon"><Icon name={actionIconName('calendar')} size={16} /></span>
                                   <span className="ai-chip-title">
                                     {act.title} {act.dueDate ? `· ${act.dueDate}` : ''}
                                     {act.assigneeName ? ` · ${act.assigneeName}` : ''}
@@ -457,7 +455,6 @@ export default function AgenticChatPanel() {
                           </div>
                         )}
 
-                        {/* Groceries Grouped by Shop */}
                         {Object.entries(groceriesByShop).map(([shopName, items]) => (
                           <div key={shopName} className="col" style={{ gap: 6 }}>
                             <div className="row" style={{ gap: 6, alignItems: 'center', marginTop: 2 }}>
@@ -482,7 +479,7 @@ export default function AgenticChatPanel() {
                                       onChange={() => {}}
                                       aria-label={act.title}
                                     />
-                                    <span className="ai-chip-icon">{renderActionIcon('grocery')}</span>
+                                    <span className="ai-chip-icon"><Icon name={actionIconName('grocery')} size={16} /></span>
                                     <span className="ai-chip-title">
                                       {act.title}
                                       {act.quantity ? ` (${act.quantity})` : ''}
@@ -497,7 +494,6 @@ export default function AgenticChatPanel() {
                           </div>
                         ))}
 
-                        {/* Other Actions (Tasks, Expenses, Delete) */}
                         {otherActions.length > 0 && (
                           <div className="col" style={{ gap: 6, marginTop: 2 }}>
                             {otherActions.map((act, idx) => {
@@ -515,7 +511,7 @@ export default function AgenticChatPanel() {
                                     onChange={() => {}}
                                     aria-label={act.title}
                                   />
-                                  <span className="ai-chip-icon">{renderActionIcon(act.type)}</span>
+                                  <span className="ai-chip-icon"><Icon name={actionIconName(act.type)} size={16} /></span>
                                   <span className="ai-chip-title">
                                     {act.title}
                                     {act.amount ? ` (₹${act.amount})` : ''}
@@ -565,7 +561,8 @@ export default function AgenticChatPanel() {
                         key={idx}
                         type="button"
                         className="agentic-chip-btn"
-                        onClick={() => sendQuery(chip)}
+                        disabled={busy}
+                        onClick={() => sendQuery({ text: chip })}
                       >
                         {chip}
                       </button>
@@ -573,9 +570,9 @@ export default function AgenticChatPanel() {
                   </div>
                 ) : null}
 
-                <div className="agentic-msg-time">
-                  {hhmm(m.timestamp)}
-                </div>
+                {m.timestamp ? (
+                  <div className="agentic-msg-time">{hhmm(m.timestamp)}</div>
+                ) : null}
               </div>
             </div>
           );
@@ -593,58 +590,119 @@ export default function AgenticChatPanel() {
         <div ref={scrollRef} />
       </div>
 
-      {/* Voice Recording Active Bar or Bottom Input Composer */}
+      {/* Composer + Voice Status */}
       <div className="chat-composer-wrap">
-        {isRecording ? (
+        {activeError ? (
+          <div className="ai-voice-alert" role="alert">
+            <Icon name="alert" size={15} />
+            <span className="grow">{activeError}</span>
+            <button
+              type="button"
+              className="ai-voice-alert-close"
+              onClick={() => { setActionError(''); voice.clearError(); }}
+              aria-label="Dismiss error"
+            >
+              <Icon name="close" size={14} />
+            </button>
+          </div>
+        ) : null}
+
+        {voice.isRecording ? (
           <div className="voice-record-bar">
             <div className="voice-record-left">
-              <span className="record-dot" />
-              <span className="record-countdown">00:{seconds < 10 ? `0${seconds}` : seconds}</span>
-              <span className="small" style={{ marginLeft: 8 }}>
-                {lang === 'ml' ? 'കേൾക്കുന്നു...' : 'Listening...'}
+              <span className="record-dot" aria-hidden="true" />
+              <span className="record-countdown">{formatSecs(voice.seconds)}</span>
+              {voice.mode === 'audio' ? (
+                <span className="record-waves" aria-hidden="true">
+                  <span className="record-wave-bar" />
+                  <span className="record-wave-bar" />
+                  <span className="record-wave-bar" />
+                  <span className="record-wave-bar" />
+                  <span className="record-wave-bar" />
+                </span>
+              ) : null}
+              <span className="voice-live-text">
+                {voice.liveTranscript
+                  ? voice.liveTranscript
+                  : lang === 'ml'
+                  ? `കേൾക്കുന്നു (${voiceBadge})...`
+                  : `Listening (${voiceBadge})...`}
               </span>
             </div>
             <div className="voice-record-actions">
               <button
                 type="button"
                 className="chat-pill-cancel-btn"
-                onClick={cancelVoice}
-                title="Cancel"
+                onClick={voice.cancel}
+                aria-label={lang === 'ml' ? 'റദ്ദാക്കുക' : 'Cancel recording'}
               >
                 <Icon name="trash" size={17} />
               </button>
+              {voice.mode === 'speech' && voice.liveTranscript ? (
+                <button
+                  type="button"
+                  className="chat-pill-cancel-btn"
+                  onClick={() => voice.stop('edit')}
+                  aria-label={lang === 'ml' ? 'തിരുത്തിയെഴുതുക' : 'Edit transcript'}
+                >
+                  <Icon name="edit" size={16} />
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="chat-pill-action-btn"
-                onClick={stopAndSendVoice}
-                title="Send"
+                onClick={() => voice.stop('send')}
+                aria-label={lang === 'ml' ? 'അയക്കുക' : 'Send voice message'}
               >
                 <Icon name="send" size={16} />
               </button>
             </div>
           </div>
         ) : (
-          /* Bottom Input Composer */
           <form
             className="chat-pill-bar"
             onSubmit={(e) => {
               e.preventDefault();
-              sendQuery(input);
+              if (!busy && input.trim()) {
+                sendQuery({ text: input });
+              }
             }}
           >
+            <label htmlFor={inputId} className="visually-hidden">
+              {lang === 'ml' ? 'Hommi AI-യോട് ചോദിക്കുക' : 'Ask Hommi AI'}
+            </label>
             <input
+              ref={inputRef}
+              id={inputId}
               className="chat-pill-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={lang === 'ml' ? 'ചോദിക്കാം (ഉദാ: എന്തൊക്കെ വാങ്ങാനുണ്ട്, ബിരിയാണി ഉണ്ടാക്കണം...)' : 'Ask Hommi AI (e.g. what to buy, make biriyani...)'}
               maxLength={1000}
+              autoComplete="off"
+              disabled={busy}
             />
+            {!input.trim() ? (
+              <button
+                type="button"
+                className="voice-lang-pill"
+                onClick={voice.toggleVoiceLocale}
+                disabled={busy}
+                aria-label={
+                  voiceBadge === 'ML'
+                    ? 'Speech language: Malayalam. Switch to English'
+                    : 'Speech language: English. Switch to Malayalam'
+                }
+              >
+                {voiceBadge}
+              </button>
+            ) : null}
             {input.trim() ? (
               <button
                 type="submit"
                 className="chat-pill-action-btn"
                 disabled={busy}
-                title="Send query"
+                aria-label={lang === 'ml' ? 'അയക്കുക' : 'Send query'}
               >
                 <Icon name="send" size={16} />
               </button>
@@ -652,8 +710,9 @@ export default function AgenticChatPanel() {
               <button
                 type="button"
                 className="chat-pill-action-btn"
-                onClick={startVoice}
-                title="Speak to Hommi AI"
+                onClick={() => voice.start()}
+                disabled={busy}
+                aria-label={lang === 'ml' ? 'ശബ്ദത്തിൽ ചോദിക്കുക' : 'Speak to Hommi AI'}
               >
                 <Icon name="mic" size={17} />
               </button>

@@ -1,128 +1,63 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
-import { useAuth } from '@/lib/auth';
+import { useState, useCallback, useId } from 'react';
+import { useAuth, notifyChanged } from '@/lib/auth';
 import { post, upload } from '@/lib/api';
-import { Sheet, Btn, Icon, Spinner } from '@/components/ui';
+import { useVoiceInput } from '@/lib/useVoiceInput';
+import { sanitizeAiActions, actionIconName } from '@/lib/aiActions';
+import { Sheet, Btn, Icon, Spinner, formatErrorMessage } from '@/components/ui';
 
 export default function AiAssistantModal({ onClose, onDone }) {
   const { lang, reloadFamily } = useAuth();
-  const [step, setStep] = useState('idle'); // 'idle' | 'recording' | 'analyzing' | 'review' | 'success' | 'error'
+  const [step, setStep] = useState('idle'); // 'idle' | 'analyzing' | 'review' | 'success' | 'error'
   const [errorMsg, setErrorMsg] = useState('');
   const [typedText, setTypedText] = useState('');
-  const [seconds, setSeconds] = useState(0);
 
-  // Analysis result
   const [analysis, setAnalysis] = useState(null);
   const [selectedActions, setSelectedActions] = useState([]);
   const [applying, setApplying] = useState(false);
 
-  const mediaRecorderRef = useRef(null);
-  const audioStreamRef = useRef(null);
-  const audioChunksRef = useRef([]);
-  const timerRef = useRef(null);
+  const inputId = useId();
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (audioStreamRef.current) {
-        audioStreamRef.current.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, []);
-
-  const startRecording = async () => {
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setErrorMsg('Microphone is not supported in this browser');
-        return;
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioStreamRef.current = stream;
-
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm')
-        ? 'audio/webm'
-        : MediaRecorder.isTypeSupported('audio/mp4')
-        ? 'audio/mp4'
-        : '';
-      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-      mediaRecorderRef.current = recorder;
-      audioChunksRef.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-
-      recorder.start(100);
-      setStep('recording');
-      setSeconds(0);
-
-      timerRef.current = setInterval(() => {
-        setSeconds((prev) => {
-          if (prev >= 29) {
-            stopAndAnalyze();
-            return 30;
-          }
-          return prev + 1;
-        });
-      }, 1000);
-    } catch {
-      setErrorMsg('Microphone access denied or unavailable. You can type below instead.');
+  const handleVoiceResult = useCallback(async ({ transcript, audioFile, speechLang, action }) => {
+    if (transcript && action === 'edit') {
+      setTypedText((prev) => (prev ? `${prev} ${transcript}` : transcript));
+      return;
     }
-  };
-
-  const stopAndAnalyze = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    const recorder = mediaRecorderRef.current;
-    if (!recorder || recorder.state === 'inactive') return;
 
     setStep('analyzing');
-    recorder.onstop = async () => {
-      if (audioStreamRef.current) {
-        audioStreamRef.current.getTracks().forEach((track) => track.stop());
-      }
-      const mime = recorder.mimeType || 'audio/webm';
-      const blob = new Blob(audioChunksRef.current, { type: mime });
-      if (blob.size === 0) {
+    setErrorMsg('');
+    try {
+      let res;
+      if (transcript) {
+        res = await post('/ai/analyze', { text: transcript, ...(speechLang ? { speechLang } : {}) });
+      } else if (audioFile) {
+        const fd = new FormData();
+        fd.append('file', audioFile);
+        if (speechLang) fd.append('speechLang', speechLang);
+        res = await upload('/ai/analyze', fd);
+      } else {
         setStep('idle');
         return;
       }
-
-      try {
-        const ext = mime.includes('mp4') ? 'mp4' : 'webm';
-        const file = new File([blob], `voice-ai-${Date.now()}.${ext}`, { type: mime });
-        const f = new FormData();
-        f.append('file', file);
-        const a = await upload('/attachments', f);
-
-        const res = await post('/ai/analyze', { attachmentId: a.id });
-        setAnalysis(res);
-        setSelectedActions(res.actions || []);
-        setStep('review');
-      } catch (err) {
-        setErrorMsg(err.message || 'Failed to analyze audio');
-        setStep('error');
-      }
-    };
-
-    recorder.stop();
-  };
-
-  const cancelRecording = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+      setAnalysis(res);
+      setSelectedActions(res.actions || []);
+      setStep('review');
+    } catch (err) {
+      setErrorMsg(formatErrorMessage(err) || 'Failed to analyze voice message');
+      setStep('idle');
     }
-    if (audioStreamRef.current) {
-      audioStreamRef.current.getTracks().forEach((track) => track.stop());
-    }
-    audioChunksRef.current = [];
-    setStep('idle');
-  };
+  }, []);
+
+  const voice = useVoiceInput({
+    uiLang: lang,
+    disabled: step === 'analyzing' || applying,
+    onResult: handleVoiceResult,
+  });
 
   const analyzeTypedText = async (e) => {
     e?.preventDefault();
     const t = typedText.trim();
-    if (!t) return;
+    if (!t || step === 'analyzing') return;
     setStep('analyzing');
     setErrorMsg('');
     try {
@@ -131,8 +66,8 @@ export default function AiAssistantModal({ onClose, onDone }) {
       setSelectedActions(res.actions || []);
       setStep('review');
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to analyze text');
-      setStep('error');
+      setErrorMsg(formatErrorMessage(err) || 'Failed to analyze text');
+      setStep('idle');
     }
   };
 
@@ -150,30 +85,14 @@ export default function AiAssistantModal({ onClose, onDone }) {
     setApplying(true);
     setErrorMsg('');
     try {
-      // Clean and sanitize payloads before sending to prevent 400 validation issues
-      const cleanedActions = selectedActions.map((a) => ({
-        type: a.type || 'grocery',
-        title: String(a.title || '').trim().slice(0, 140),
-        quantity: a.quantity ? String(a.quantity).slice(0, 60) : null,
-        category: a.category ? String(a.category).slice(0, 50) : null,
-        shop: a.shop ? String(a.shop).slice(0, 60) : null,
-        amount: typeof a.amount === 'number' && !isNaN(a.amount) ? a.amount : null,
-        dueDate: a.dueDate || undefined,
-        slot: a.slot || undefined,
-        date: a.date || undefined,
-        cookName: a.cookName || undefined,
-        assigneeName: a.assigneeName || undefined,
-        targetId: a.targetId || undefined,
-        ingredients: Array.isArray(a.ingredients) ? a.ingredients : undefined,
-        steps: Array.isArray(a.steps) ? a.steps : undefined,
-      }));
-
+      const cleanedActions = sanitizeAiActions(selectedActions);
       await post('/ai/apply', { actions: cleanedActions, notifyInChat: true });
       setStep('success');
+      notifyChanged();
       reloadFamily().catch(() => {});
       if (onDone) onDone();
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to save items');
+      setErrorMsg(formatErrorMessage(err) || 'Failed to save items');
     } finally {
       setApplying(false);
     }
@@ -185,16 +104,7 @@ export default function AiAssistantModal({ onClose, onDone }) {
     return `${m}:${r < 10 ? '0' : ''}${r}`;
   };
 
-  const renderActionIcon = (type) => {
-    if (type?.includes('grocery')) return <Icon name="cart" size={16} />;
-    if (type?.includes('recipe')) return <Icon name="recipes" size={16} />;
-    if (type?.includes('meal')) return <Icon name="meals" size={16} />;
-    if (type?.includes('calendar')) return <Icon name="calendar" size={16} />;
-    if (type?.includes('expense')) return <Icon name="money" size={16} />;
-    if (type?.includes('bill')) return <Icon name="bills" size={16} />;
-    if (type?.includes('medicine')) return <Icon name="med" size={16} />;
-    return <Icon name="tasks" size={16} />;
-  };
+  const renderActionIcon = (type) => <Icon name={actionIconName(type)} size={16} />;
 
   // Group actions by kind and shop
   const recipeActions = (analysis?.actions || []).filter((a) => a.type?.includes('recipe'));
@@ -213,6 +123,9 @@ export default function AiAssistantModal({ onClose, onDone }) {
     groceriesByShop[shop].push(g);
   }
 
+  const displayedError = errorMsg || voice.error;
+  const voiceBadge = voice.voiceLocale === 'ml-IN' ? 'ML' : 'EN';
+
   return (
     <Sheet
       title={
@@ -230,29 +143,40 @@ export default function AiAssistantModal({ onClose, onDone }) {
             : 'Speak naturally in Malayalam, Manglish, or English (e.g. "Making biriyani for 5, add recipe and groceries by shop", "Buy 1L milk tomorrow").'}
         </p>
 
-        {errorMsg ? (
-          <div style={{ padding: '8px 12px', background: 'rgba(239, 68, 68, 0.1)', color: '#DC2626', borderRadius: 8, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+        {displayedError ? (
+          <div role="alert" style={{ padding: '8px 12px', background: 'rgba(239, 68, 68, 0.1)', color: '#DC2626', borderRadius: 8, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
             <Icon name="alert" size={16} />
-            <span>{errorMsg}</span>
+            <span className="grow">{displayedError}</span>
           </div>
         ) : null}
 
-        {step === 'idle' ? (
+        {step === 'idle' && !voice.isRecording ? (
           <div style={{ textAlign: 'center', padding: '12px 0' }}>
             <button
               type="button"
               className="ai-modal-pulse"
-              onClick={startRecording}
-              title="Tap to speak"
-              aria-label="Tap to speak"
+              onClick={() => voice.start()}
+              aria-label={lang === 'ml' ? 'സംസാരിക്കാൻ ഇവിടെ അമർത്തുക' : 'Tap to speak'}
             >
               <Icon name="mic" size={32} />
             </button>
             <div style={{ fontWeight: 600, fontSize: 14, marginTop: 8 }}>
               {lang === 'ml' ? 'സംസാരിക്കാൻ ഇവിടെ അമർത്തുക' : 'Tap to speak'}
             </div>
-            <div className="muted small" style={{ marginTop: 2 }}>
-              {lang === 'ml' ? 'മലയാളത്തിലും പറയാം' : 'Supports Malayalam & English'}
+            <div className="muted small" style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <span>{lang === 'ml' ? 'ഭാഷ:' : 'Voice:'}</span>
+              <button
+                type="button"
+                className="voice-lang-pill"
+                onClick={voice.toggleVoiceLocale}
+                aria-label={
+                  voiceBadge === 'ML'
+                    ? 'Speech language: Malayalam. Switch to English'
+                    : 'Speech language: English. Switch to Malayalam'
+                }
+              >
+                {voiceBadge === 'ML' ? 'മലയാളം (ML)' : 'English (EN)'}
+              </button>
             </div>
 
             <div style={{ margin: '20px 0 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -262,12 +186,17 @@ export default function AiAssistantModal({ onClose, onDone }) {
             </div>
 
             <form onSubmit={analyzeTypedText} style={{ display: 'flex', gap: 8 }}>
+              <label htmlFor={inputId} className="visually-hidden">
+                {lang === 'ml' ? 'സന്ദേശം ടൈപ്പ് ചെയ്യുക' : 'Type your request'}
+              </label>
               <input
+                id={inputId}
                 className="input"
                 style={{ flex: 1 }}
                 placeholder={lang === 'ml' ? 'ഉദാ: ബിരിയാണി ഉണ്ടാക്കണം, സാധനങ്ങൾ ചേർക്കൂ...' : 'e.g. Suggest biryani recipe and groceries...'}
                 value={typedText}
                 onChange={(e) => setTypedText(e.target.value)}
+                autoComplete="off"
               />
               <Btn type="submit" disabled={!typedText.trim()}>
                 {lang === 'ml' ? 'പരിശോധിക്കുക' : 'Check'}
@@ -276,27 +205,37 @@ export default function AiAssistantModal({ onClose, onDone }) {
           </div>
         ) : null}
 
-        {step === 'recording' ? (
+        {voice.isRecording ? (
           <div style={{ textAlign: 'center', padding: '16px 0' }}>
             <button
               type="button"
               className="ai-modal-pulse recording"
-              onClick={stopAndAnalyze}
-              title="Stop and process"
-              aria-label="Stop recording"
+              onClick={() => voice.stop('send')}
+              aria-label={lang === 'ml' ? 'നിർത്തി പ്രോസസ്സ് ചെയ്യുക' : 'Stop and process recording'}
             >
               <span style={{ width: 20, height: 20, background: '#FFFFFF', borderRadius: 4 }} />
             </button>
             <div style={{ fontWeight: 700, fontSize: 18, color: '#DC2626', marginTop: 8 }}>
-              {formatSecs(seconds)} / 0:30
+              {formatSecs(voice.seconds)} / 0:30
             </div>
-            <div className="muted small" style={{ marginTop: 4 }}>
-              {lang === 'ml' ? 'കേൾക്കുന്നു... പറഞ്ഞ് കഴിഞ്ഞ് മുകളിൽ അമർത്തുക' : 'Listening... Tap above when finished speaking'}
-            </div>
-            <div style={{ marginTop: 14 }}>
-              <Btn tone="ghost" size="sm" onClick={cancelRecording}>
+            {voice.liveTranscript ? (
+              <div className="ai-transcription-box" style={{ marginTop: 10, textAlign: 'left' }}>
+                “{voice.liveTranscript}”
+              </div>
+            ) : (
+              <div className="muted small" style={{ marginTop: 4 }}>
+                {lang === 'ml' ? `കേൾക്കുന്നു (${voiceBadge})... പറഞ്ഞ് കഴിഞ്ഞ് മുകളിൽ അമർത്തുക` : `Listening (${voiceBadge})... Tap above when finished speaking`}
+              </div>
+            )}
+            <div style={{ marginTop: 14, display: 'inline-flex', gap: 8 }}>
+              <Btn tone="ghost" size="sm" onClick={voice.cancel}>
                 {lang === 'ml' ? 'റദ്ദാക്കുക' : 'Cancel'}
               </Btn>
+              {voice.mode === 'speech' && voice.liveTranscript ? (
+                <Btn tone="ghost" size="sm" onClick={() => voice.stop('edit')}>
+                  {lang === 'ml' ? 'തിരുത്തുക' : 'Edit text'}
+                </Btn>
+              ) : null}
             </div>
           </div>
         ) : null}
