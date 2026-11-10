@@ -15,13 +15,13 @@ function buildWelcomeMessage(lang) {
     role: 'assistant',
     text:
       lang === 'ml'
-        ? 'നമസ്കാരം! ഞാൻ നിങ്ങളുടെ Hommi AI സഹായിയാണ്. അടുക്കളയിലെ സാധനങ്ങൾ അറിയാനും, ബിരിയാണി പോലുള്ള വിഭവങ്ങൾക്കുള്ള ലിസ്റ്റ് തയ്യാറാക്കാനും, ജോലികൾ നൽകാനും, ഈ മാസത്തെ ചിലവ് കണക്കാക്കാനും എന്നോട് ചോദിക്കാം.'
-        : 'Hello! I am your Hommi AI assistant. Ask me what groceries to buy, ingredients needed for biriyani, pending chores, or this month’s family expenses.',
+        ? 'നമസ്കാരം! ഞാൻ നിങ്ങളുടെ Hommi AI സഹായിയാണ്. അടുക്കളയിലെ സാധനങ്ങൾ വെച്ച് പെട്ടെന്ന് എന്ത് ഉണ്ടാക്കാം എന്നും, ബിരിയാണി പോലുള്ള വിഭവങ്ങളുടെ മുഴുവൻ റെസിപ്പിയും സാധനങ്ങളുടെ ലിസ്റ്റും, ജോലികളും, ഈ മാസത്തെ ചിലവും എന്നോട് ചോദിക്കാം.'
+        : 'Hello! I am your Hommi AI assistant. Ask me what fast meal you can cook from your kitchen groceries, detailed step-by-step recipes, pending chores, or this month’s family expenses.',
     actions: [],
     suggestedChips:
       lang === 'ml'
-        ? ['എന്തൊക്കെ വാങ്ങാനുണ്ട്?', 'ബിരിയാണി ഉണ്ടാക്കാൻ എന്ത് വേണം?', 'ഈ മാസത്തെ ചിലവ് എത്ര?', 'ഇന്നത്തെ മരുന്നുകൾ']
-        : ['What to buy?', 'Make Biriyani (check kitchen)', 'Monthly expenses', 'Today’s medicines'],
+        ? ['അടുക്കളയിലെ സാധനങ്ങൾ വെച്ച് പെട്ടെന്ന് എന്ത് ഉണ്ടാക്കാം?', 'എന്തൊക്കെ വാങ്ങാനുണ്ട്?', 'ബിരിയാണി ഉണ്ടാക്കാൻ എന്ത് വേണം?', 'ഈ മാസത്തെ ചിലവ് എത്ര?', 'ഇന്നത്തെ മരുന്നുകൾ']
+        : ['What can I cook fast?', 'What to buy?', 'Make Biriyani (check kitchen)', 'Monthly expenses', 'Today’s medicines'],
   };
 }
 
