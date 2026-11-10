@@ -991,8 +991,7 @@ export default function ChatPanel({ compact = false }) {
       <div className="chat-chips-bar" aria-label="Quick actions">
         <button
           type="button"
-          className="chat-chip-pill"
-          style={{ background: 'rgba(13, 71, 52, 0.08)', color: 'var(--brand)', borderColor: 'rgba(13, 71, 52, 0.2)', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          className="chat-chip-pill ai-voice"
           onClick={() => setAiModalOpen(true)}
           title={t('chat.ai_voice_assistant')}
         >
