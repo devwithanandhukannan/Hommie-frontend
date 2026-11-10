@@ -175,9 +175,11 @@ export default function Today() {
   const meals = (d.todayMeals || []).filter((m) => m.items?.length);
   const net = d.wallet?.net || 0;
   const low = d.grocery?.likelyLow || [];
+  const hasHome = Boolean(meals.length || d.grocery?.needed || low.length || net !== 0);
+  const hasSide = Boolean(soon.length || hasHome);
 
   return (
-    <div>
+    <div className="today-page">
       <h1 className="today-hello">{greet}{first ? `, ${first}` : ''}</h1>
       <p className="today-sentence">{sentence}</p>
 
@@ -197,44 +199,55 @@ export default function Today() {
       </div>
 
       {day !== today ? <DayTimeline day={day} today={today} t={t} /> : (
-        <>
-          <section className="goal" aria-label={t('goal.title')}>
-            <div className="goal-top"><span>{t('goal.title')}</span><span><b>{done.length}/{total}</b> {t('goal.completed')}</span></div>
-            <div className="goal-body">
-              <div className="goal-pct">{total ? pct : '—'}{total ? <small>%</small> : null}</div>
-              <div className="dots" aria-hidden="true">{Array.from({ length: 10 }, (_, i) => <i key={i} className={i < filled ? 'on' : ''} />)}</div>
-            </div>
-          </section>
-
-          {shown.length || done.length ? (
-            <div className="trows">
-              {shown.map(({ key, now, ...r }) => <TaskRow key={key} {...r} />)}
-              {done.slice(0, 3).map(({ key, ...r }) => <TaskRow key={key} done {...r} />)}
-            </div>
-          ) : null}
-          {hidden > 0 ? <button type="button" className="link-btn" onClick={() => setExpanded(true)}>{t('today.more')} ({hidden})</button> : null}
-          {expanded && pending.length > LIMIT ? <button type="button" className="link-btn" onClick={() => setExpanded(false)}>{t('today.less')}</button> : null}
-
-          {soon.length ? (
-            <>
-              <h2 className="today-title">{t('today.soon')}</h2>
-              <div className="mini-lines">
-                {soon.slice(0, 4).map((s) => <Link key={s.key} href={s.href} className="mini-line"><span>{s.title}</span><span className="small muted">{s.sub}</span></Link>)}
+        <div className={hasSide ? 'today-grid' : 'today-grid is-single'}>
+          <div className="today-primary">
+            <section className="goal" aria-label={t('goal.title')}>
+              <div className="goal-top"><span>{t('goal.title')}</span><span><b>{done.length}/{total}</b> {t('goal.completed')}</span></div>
+              <div className="goal-body">
+                <div className="goal-pct">{total ? pct : '—'}{total ? <small>%</small> : null}</div>
+                <div className="dots" aria-hidden="true">{Array.from({ length: 10 }, (_, i) => <i key={i} className={i < filled ? 'on' : ''} />)}</div>
               </div>
-            </>
-          ) : null}
+            </section>
 
-          <h2 className="today-title">{family?.name}</h2>
-          <div className="mini-lines">
-            {meals.length ? <Link href="/planner?tab=meals" className="mini-line"><span>{meals.map((m) => m.items.join(', ')).join(' · ')}</span><Icon name="meals" size={20} /></Link> : null}
-            {d.grocery?.needed ? <Link href="/planner?tab=grocery" className="mini-line"><span>{d.grocery.needed} {t('today.grocery_n')}</span><Icon name="cart" size={20} /></Link> : null}
-            {low.length ? (
-              <div className="mini-line"><span>{t('today.low')}: {low.slice(0, 3).map((g) => g.name).join(', ')}</span><button type="button" className="chip" style={{ border: 0, cursor: 'pointer' }} onClick={() => low.slice(0, 3).forEach((g) => act(() => post(`/grocery/${g.id}/need`, {})))}>{t('today.restock')}</button></div>
+            {shown.length || done.length ? (
+              <div className="trows">
+                {shown.map(({ key, now, ...r }) => <TaskRow key={key} {...r} />)}
+                {done.slice(0, 3).map(({ key, ...r }) => <TaskRow key={key} done {...r} />)}
+              </div>
             ) : null}
-            {net !== 0 ? <Link href="/money?tab=wallet" className="mini-line"><span>{net < 0 ? t('today.owe') : t('today.owed')} <b>{rupees(Math.abs(net))}</b></span><span className="small muted">{t('dash.settle_up')}</span></Link> : null}
+            {hidden > 0 ? <button type="button" className="link-btn" onClick={() => setExpanded(true)}>{t('today.more')} ({hidden})</button> : null}
+            {expanded && pending.length > LIMIT ? <button type="button" className="link-btn" onClick={() => setExpanded(false)}>{t('today.less')}</button> : null}
+            {!hasSide ? <div style={{ marginTop: 18 }}><NotificationAsk t={t} /></div> : null}
           </div>
-          <div style={{ marginTop: 18 }}><NotificationAsk t={t} /></div>
-        </>
+
+          {hasSide ? (
+            <div className="today-side">
+              {soon.length ? (
+                <>
+                  <h2 className="today-title">{t('today.soon')}</h2>
+                  <div className="mini-lines">
+                    {soon.slice(0, 4).map((s) => <Link key={s.key} href={s.href} className="mini-line"><span>{s.title}</span><span className="small muted">{s.sub}</span></Link>)}
+                  </div>
+                </>
+              ) : null}
+
+              {hasHome ? (
+                <>
+                  <h2 className="today-title">{family?.name}</h2>
+                  <div className="mini-lines">
+                    {meals.length ? <Link href="/planner?tab=meals" className="mini-line"><span>{meals.map((m) => m.items.join(', ')).join(' · ')}</span><Icon name="meals" size={20} /></Link> : null}
+                    {d.grocery?.needed ? <Link href="/planner?tab=grocery" className="mini-line"><span>{d.grocery.needed} {t('today.grocery_n')}</span><Icon name="cart" size={20} /></Link> : null}
+                    {low.length ? (
+                      <div className="mini-line"><span>{t('today.low')}: {low.slice(0, 3).map((g) => g.name).join(', ')}</span><button type="button" className="chip" style={{ border: 0, cursor: 'pointer' }} onClick={() => low.slice(0, 3).forEach((g) => act(() => post(`/grocery/${g.id}/need`, {})))}>{t('today.restock')}</button></div>
+                    ) : null}
+                    {net !== 0 ? <Link href="/money?tab=wallet" className="mini-line"><span>{net < 0 ? t('today.owe') : t('today.owed')} <b>{rupees(Math.abs(net))}</b></span><span className="small muted">{t('dash.settle_up')}</span></Link> : null}
+                  </div>
+                </>
+              ) : null}
+              <div style={{ marginTop: 18 }}><NotificationAsk t={t} /></div>
+            </div>
+          ) : null}
+        </div>
       )}
 
       {amountFor ? <AmountSheet inst={amountFor} onClose={() => { setAmountFor(null); reload(); }} /> : null}

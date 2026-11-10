@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { del, get, getBlob, post, upload } from '@/lib/api';
 import { useAuth, useData } from '@/lib/auth';
 import { Badge, Btn, Empty, ErrorNote, Field, Input, PageHeader, Sheet, Spinner, useAction, useConfirm } from '@/components/ui';
+import StepTimeline from '@/components/StepTimeline';
 
 function Photo({ id }) {
   const [src, setSrc] = useState(null);
@@ -63,8 +64,7 @@ function RecipeView({ id, onClose, onDeleted }) {
           <div className="row wrap">{r.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
           <h2>{t('recipes.field_ingredients')}</h2>
           <ul style={{ margin: 0, paddingLeft: 18 }}>{r.ingredients.map((i, n) => <li key={n}>{i.name}{i.qty ? ` — ${i.qty}` : ''}</li>)}</ul>
-          <h2>{t('recipes.field_steps')}</h2>
-          <ol style={{ margin: 0, paddingLeft: 18 }}>{r.steps.map((s, n) => <li key={n} style={{ marginBottom: 6 }}>{s}</li>)}</ol>
+          <StepTimeline steps={r.steps} title={t('recipes.field_steps')} estimate />
           <div className="row wrap">
             <Btn onClick={() => run(() => post(`/recipes/${id}/add-to-grocery`, {}), 'Ingredients added to grocery')}>{t('chat.add_grocery')}</Btn>
             {r.createdBy?.membershipId === me || family.myRole !== 'member' ? <Btn tone="ghost" onClick={async () => { if (await confirm('Delete this recipe?') && await run(() => del(`/recipes/${id}`), 'Deleted')) { onDeleted(); onClose(); } }}>{t('btn.delete')}</Btn> : null}

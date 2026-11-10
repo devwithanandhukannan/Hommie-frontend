@@ -225,7 +225,7 @@ function Schedules() {
     <>
       <div style={{ marginBottom: 12 }}><Btn onClick={() => setAdding(true)}>{t('bills.new_bill')}</Btn></div>
       {loading && !data ? <Spinner /> : error ? <ErrorNote error={error} /> : !data.length ? <Empty>No recurring bills.</Empty> : (
-        <div className="col">{data.map((b) => {
+        <div className="grid-auto">{data.map((b) => {
           const canManage = b.createdBy?.membershipId === me || family.myRole !== 'member';
           return (
             <section key={b.id} className="card">

@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 import { post, upload } from '@/lib/api';
 import { Icon, Spinner } from '@/components/ui';
+import StepTimeline, { InlineMarkdown, parseAiReply } from '@/components/StepTimeline';
 import { hhmm } from '@/lib/format';
 
 export default function AgenticChatPanel() {
@@ -101,12 +102,13 @@ export default function AgenticChatPanel() {
 
       setMessages((prev) => [...prev, assistantMsg]);
     } catch {
+      const replyIsMl = /[\u0D00-\u0D7F]/.test(textToSend) || (lang === 'ml' && !textToSend);
       setMessages((prev) => [
         ...prev,
         {
           id: String(Date.now() + 2),
           role: 'assistant',
-          text: lang === 'ml' ? 'ക്ഷമിക്കണം, ബന്ധപ്പെടാൻ സാധിച്ചില്ല. ദയവായി വീണ്ടും ശ്രമിക്കുക.' : 'Sorry, could not process request. Please try again.',
+          text: replyIsMl ? 'ക്ഷമിക്കണം, ബന്ധപ്പെടാൻ സാധിച്ചില്ല. ദയവായി വീണ്ടും ശ്രമിക്കുക.' : 'Sorry, could not process request. Please try again.',
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -284,12 +286,61 @@ export default function AgenticChatPanel() {
             groceriesByShop[shop].push(g);
           }
 
+          const blocks = isUser ? null : parseAiReply(m.text, {
+            hasRecipeAction: recipeActions.length > 0,
+            missingNames: groceryActions.map((g) => g.title),
+          });
+          const hasInlineSteps = Boolean(blocks?.some((b) => b.type === 'steps'));
+
           return (
             <div key={m.id} className={`agentic-msg-row ${isUser ? 'user' : 'assistant'}`}>
               <div className={`agentic-bubble ${isUser ? 'user' : 'assistant'}`}>
-                <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                  {m.text}
-                </div>
+                {isUser ? (
+                  <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{m.text}</div>
+                ) : (
+                  <div className="agentic-rich">
+                    {blocks.map((b, bi) => {
+                      if (b.type === 'heading') return <div key={bi} className="agentic-sec-title">{b.text}</div>;
+                      if (b.type === 'bullets') {
+                        return (
+                          <ul key={bi} className="agentic-bullets">
+                            {b.items.map((item, ii) => <li key={ii}><InlineMarkdown text={item} /></li>)}
+                          </ul>
+                        );
+                      }
+                      if (b.type === 'ingredients') {
+                        return (
+                          <div key={bi} className="ai-ing-wrap">
+                            <div className="agentic-sec-title">{b.title}</div>
+                            <div className="ai-ing-list">
+                              {b.items.map((ing, ii) => (
+                                <div key={ii} className={`ai-ing-row ${ing.inKitchen ? 'in-stock' : ing.missing ? 'missing' : ''}`}>
+                                  <span className="ai-ing-name">{ing.name}</span>
+                                  <span className="ai-ing-right">
+                                    {ing.qty ? <span className="ai-ing-qty">{ing.qty}</span> : null}
+                                    {ing.inKitchen ? (
+                                      <span className="ai-ing-badge">{lang === 'ml' ? 'അടുക്കളയിൽ ഉണ്ട്' : 'In kitchen'}</span>
+                                    ) : ing.missing ? (
+                                      <span className="ai-ing-badge is-missing">{lang === 'ml' ? 'ഇല്ല' : 'Not in kitchen'}</span>
+                                    ) : null}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      if (b.type === 'steps') {
+                        return <StepTimeline key={bi} steps={b.steps} title={b.title} estimate={b.isRecipe} />;
+                      }
+                      return (
+                        <div key={bi} className="agentic-p">
+                          <InlineMarkdown text={b.text} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {/* Proposed Action Card */}
                 {!isUser && m.actions && m.actions.length > 0 ? (
@@ -319,25 +370,34 @@ export default function AgenticChatPanel() {
                             {recipeActions.map((act, idx) => {
                               const isSelected = (m.selectedActions || []).includes(act);
                               return (
-                                <div
-                                  key={`rec-${idx}`}
-                                  className={`ai-chip-item ${!isSelected ? 'deselected' : ''}`}
-                                  onClick={() => toggleActionItem(m.id, act)}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    className="ai-chip-checkbox"
-                                    checked={isSelected}
-                                    onChange={() => {}}
-                                    aria-label={act.title}
-                                  />
-                                  <span className="ai-chip-icon">{renderActionIcon('recipe')}</span>
-                                  <span className="ai-chip-title" style={{ fontWeight: 600 }}>
-                                    {act.title}
-                                  </span>
-                                  <span className="ai-chip-tag">
-                                    {lang === 'ml' ? 'പാചകക്കുറിപ്പ്' : 'Recipe'}
-                                  </span>
+                                <div key={`rec-${idx}`} className="col" style={{ gap: 6 }}>
+                                  <div
+                                    className={`ai-chip-item ${!isSelected ? 'deselected' : ''}`}
+                                    onClick={() => toggleActionItem(m.id, act)}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="ai-chip-checkbox"
+                                      checked={isSelected}
+                                      onChange={() => {}}
+                                      aria-label={act.title}
+                                    />
+                                    <span className="ai-chip-icon">{renderActionIcon('recipe')}</span>
+                                    <span className="ai-chip-title" style={{ fontWeight: 600 }}>
+                                      {act.title}
+                                    </span>
+                                    {act.steps?.length ? (
+                                      <span className="small muted">{act.steps.length} steps</span>
+                                    ) : null}
+                                    <span className="ai-chip-tag">
+                                      {lang === 'ml' ? 'പാചകക്കുറിപ്പ്' : 'Recipe'}
+                                    </span>
+                                  </div>
+                                  {!hasInlineSteps && act.steps?.length ? (
+                                    <div className="ai-act-steps-box">
+                                      <StepTimeline steps={act.steps} title={lang === 'ml' ? 'തയ്യാറാക്കുന്ന വിധം' : 'Steps'} estimate />
+                                    </div>
+                                  ) : null}
                                 </div>
                               );
                             })}

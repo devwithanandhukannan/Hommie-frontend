@@ -797,7 +797,7 @@ export default function CalendarPage({ embedded = false }) {
             scheduleGroups.length === 0 ? (
               <Empty>Nothing coming up in {monthTitle}.</Empty>
             ) : (
-              <div className="col" style={{ gap: 18 }}>
+              <div className="cal-sched-grid">
                 {scheduleGroups.map(({ date: d, events: evs }) => {
                   const weekday = new Date(`${d}T00:00:00Z`).toLocaleDateString(locale, { weekday: 'short', timeZone: 'UTC' });
                   return (

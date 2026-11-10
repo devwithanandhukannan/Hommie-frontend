@@ -146,5 +146,9 @@ export function useData(path, { interval = 0, deps = [] } = {}) {
       document.removeEventListener('visibilitychange', refresh);
     };
   }, [load, familyId, interval, ...deps]); // eslint-disable-line react-hooks/exhaustive-deps
-  return { ...state, reload: () => load(true), setData: (data) => setState((s) => ({ ...s, data })) };
+  return {
+    ...state,
+    reload: () => load(true),
+    setData: (data) => setState((s) => ({ ...s, data: typeof data === 'function' ? data(s.data) : data })),
+  };
 }

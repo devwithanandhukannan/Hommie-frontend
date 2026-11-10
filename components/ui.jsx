@@ -118,14 +118,16 @@ export function PageHeader({ title, sub, children }) {
 
 export function Sheet({ title, onClose, children }) {
   const ref = useRef(null);
+  const onCloseRef = useRef(onClose);
   const lang = getAppLang();
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
   useEffect(() => {
     const prev = document.activeElement;
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e) => { if (e.key === 'Escape') onCloseRef.current(); };
     document.addEventListener('keydown', onKey);
-    ref.current?.querySelector('input,select,textarea,button')?.focus();
+    ref.current?.querySelector('form input:not([type="hidden"]), form select, form textarea, input, select, textarea, button')?.focus();
     return () => { document.removeEventListener('keydown', onKey); prev?.focus?.(); };
-  }, [onClose]);
+  }, []);
   return (
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label={title} ref={ref}>

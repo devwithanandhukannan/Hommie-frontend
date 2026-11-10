@@ -49,7 +49,7 @@ function FamilySwitcher({ onClose }) {
                     flexShrink: 0,
                   }}
                 >
-                  <img src="/icon.svg?v=2" alt="Family" width="24" height="24" style={{ objectFit: 'contain' }} />
+                  <img src="/icon-192.png" alt="Family" width="24" height="24" style={{ objectFit: 'contain', borderRadius: 6 }} />
                 </span>
                 <div><div className="bold">{f.name}</div><div className="small muted">{f.myRole} · {f.memberCount} member{f.memberCount === 1 ? '' : 's'}</div></div>
               </div>
@@ -124,7 +124,7 @@ export default function Shell({ children }) {
           flexShrink: 0,
         }}
       >
-        <img src="/icon.svg?v=2" alt="Home" width="22" height="22" style={{ objectFit: 'contain' }} />
+        <img src="/icon-192.png" alt="Home" width="22" height="22" style={{ objectFit: 'contain', borderRadius: 6 }} />
       </span>
       <span style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{family?.name || 'Family'}</span>
       <Icon name="swap" size={16} />
