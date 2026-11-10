@@ -83,9 +83,30 @@ export function InlineMarkdown({ text }) {
   );
 }
 
+function normalizeReplyLines(raw) {
+  let s = String(raw || '').replace(/\r\n/g, '\n');
+  s = s.replace(
+    /\s+(?=(?:\*\*|#{1,4}\s*)?(?:Ingredients|Simple Steps|Steps|Instructions|Method|Directions|ചേരുവകൾ|തയ്യാറാക്കുന്ന വിധം)\s*:?(?:\*\*)?(?:\s|$))/gi,
+    '\n\n',
+  );
+  s = s.replace(
+    /((?:Ingredients|Simple Steps|Steps|Instructions|Method|Directions|ചേരുവകൾ|തയ്യാറാക്കുന്ന വിധം)\s*:?(?:\*\*)?)\s+(?=(?:[-*•]|\d+[.)])\s)/gi,
+    '$1\n',
+  );
+  s = s.replace(
+    /(?:(?<=[:.)!?])|(?<=\b(?:kitchen|buy|stock|ഉണ്ട്|ഇല്ല)))\s+[-*•]\s+(?=[A-Za-z\u0D00-\u0D7F\u0900-\u097F\u0B80-\u0BFF])/g,
+    '\n- ',
+  );
+  s = s.replace(
+    /\s+(?=\d+[.)]\s+[A-Za-z\u0D00-\u0D7F\u0900-\u097F\u0B80-\u0BFF])/g,
+    '\n',
+  );
+  return s;
+}
+
 /** Parses AI markdown replies into structured paragraphs, ingredients lists, and numbered step timelines. */
 export function parseAiReply(text, { hasRecipeAction = false, missingNames = [] } = {}) {
-  const lines = String(text || '').split('\n');
+  const lines = normalizeReplyLines(text).split('\n');
   const blocks = [];
   let currentHeading = '';
   let textBuf = [];
@@ -157,8 +178,11 @@ export function parseAiReply(text, { hasRecipeAction = false, missingNames = [] 
       continue;
     }
 
-    // Heading line like "**Ingredients:**" or "### Simple Steps:"
-    const headingMatch = line.match(/^(?:#{1,4}\s*|\*\*)?([^*:#]+?):?\*\*$/i) || line.match(/^#{1,4}\s+(.+?):?$/);
+    // Heading line like "**Ingredients:**", "### Simple Steps:", or "Ingredients:"
+    const headingMatch =
+      line.match(/^(?:#{1,4}\s*|\*\*)?([^*:#]+?):?\*\*$/i) ||
+      line.match(/^#{1,4}\s+(.+?):?$/) ||
+      line.match(/^(Ingredients|Simple Steps|Steps|Instructions|Method|Directions|ചേരുവകൾ|തയ്യാറാക്കുന്ന വിധം)\s*:?$/i);
     if (headingMatch && line.length < 60 && !/^\d+\./.test(line) && !/^[-*•]\s/.test(line)) {
       flushText();
       flushBullets();
@@ -280,6 +304,64 @@ export default function StepTimeline({ steps = [], title = 'Steps', estimate = t
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** Renders structured AI reply text (paragraphs, kitchen-aware ingredient dots, bullets, and step timelines). */
+export function AiReplyBody({ text, lang = 'en', hasRecipeAction = false, missingNames = [] }) {
+  const blocks = parseAiReply(text, { hasRecipeAction, missingNames });
+  if (!blocks.length) return null;
+
+  return (
+    <div className="agentic-rich">
+      {blocks.map((b, bi) => {
+        if (b.type === 'heading') return <div key={bi} className="agentic-sec-title">{b.text}</div>;
+        if (b.type === 'bullets') {
+          return (
+            <ul key={bi} className="agentic-bullets">
+              {b.items.map((item, ii) => <li key={ii}><InlineMarkdown text={item} /></li>)}
+            </ul>
+          );
+        }
+        if (b.type === 'ingredients') {
+          const missingCount = b.items.filter((x) => x.missing).length;
+          return (
+            <div key={bi} className="ai-ing-wrap">
+              <div className="row between" style={{ gap: 8, alignItems: 'center' }}>
+                <div className="agentic-sec-title">{b.title}</div>
+                {missingCount > 0 ? (
+                  <span className="ai-ing-legend">
+                    <span className="ai-ing-dot is-missing" aria-hidden="true" />
+                    <span>{lang === 'ml' ? `${missingCount} അടുക്കളയിൽ ഇല്ല` : `${missingCount} not in kitchen`}</span>
+                  </span>
+                ) : null}
+              </div>
+              <div className="ai-ing-list">
+                {b.items.map((ing, ii) => (
+                  <div key={ii} className={`ai-ing-row ${ing.inKitchen ? 'in-stock' : ing.missing ? 'missing' : ''}`}>
+                    <span className={`ai-ing-dot ${ing.missing ? 'is-missing' : ing.inKitchen ? 'is-ok' : ''}`} aria-hidden="true" />
+                    <span className="ai-ing-name">{ing.name}</span>
+                    {ing.qty || ing.inKitchen ? (
+                      <span className="ai-ing-qty">
+                        {[ing.qty, ing.inKitchen ? (lang === 'ml' ? 'ഉണ്ട്' : 'in kitchen') : ''].filter(Boolean).join(' · ')}
+                      </span>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+        if (b.type === 'steps') {
+          return <StepTimeline key={bi} steps={b.steps} title={b.title} estimate={b.isRecipe} />;
+        }
+        return (
+          <div key={bi} className="agentic-p">
+            <InlineMarkdown text={b.text} />
+          </div>
+        );
+      })}
     </div>
   );
 }

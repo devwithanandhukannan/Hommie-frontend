@@ -5,7 +5,7 @@ import { post, upload } from '@/lib/api';
 import { useVoiceInput } from '@/lib/useVoiceInput';
 import { sanitizeAiActions, actionIconName } from '@/lib/aiActions';
 import { Icon, Spinner, formatErrorMessage } from '@/components/ui';
-import StepTimeline, { InlineMarkdown, parseAiReply } from '@/components/StepTimeline';
+import StepTimeline, { AiReplyBody, parseAiReply } from '@/components/StepTimeline';
 import { hhmm } from '@/lib/format';
 
 function buildWelcomeMessage(lang) {
@@ -289,55 +289,12 @@ export default function AgenticChatPanel() {
                 {isUser ? (
                   <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{m.text}</div>
                 ) : (
-                  <div className="agentic-rich">
-                    {blocks.map((b, bi) => {
-                      if (b.type === 'heading') return <div key={bi} className="agentic-sec-title">{b.text}</div>;
-                      if (b.type === 'bullets') {
-                        return (
-                          <ul key={bi} className="agentic-bullets">
-                            {b.items.map((item, ii) => <li key={ii}><InlineMarkdown text={item} /></li>)}
-                          </ul>
-                        );
-                      }
-                      if (b.type === 'ingredients') {
-                        const missingCount = b.items.filter((x) => x.missing).length;
-                        return (
-                          <div key={bi} className="ai-ing-wrap">
-                            <div className="row between" style={{ gap: 8, alignItems: 'center' }}>
-                              <div className="agentic-sec-title">{b.title}</div>
-                              {missingCount > 0 ? (
-                                <span className="ai-ing-legend">
-                                  <span className="ai-ing-dot is-missing" aria-hidden="true" />
-                                  <span>{lang === 'ml' ? `${missingCount} അടുക്കളയിൽ ഇല്ല` : `${missingCount} not in kitchen`}</span>
-                                </span>
-                              ) : null}
-                            </div>
-                            <div className="ai-ing-list">
-                              {b.items.map((ing, ii) => (
-                                <div key={ii} className={`ai-ing-row ${ing.inKitchen ? 'in-stock' : ing.missing ? 'missing' : ''}`}>
-                                  <span className={`ai-ing-dot ${ing.missing ? 'is-missing' : ing.inKitchen ? 'is-ok' : ''}`} aria-hidden="true" />
-                                  <span className="ai-ing-name">{ing.name}</span>
-                                  {ing.qty || ing.inKitchen ? (
-                                    <span className="ai-ing-qty">
-                                      {[ing.qty, ing.inKitchen ? (lang === 'ml' ? 'ഉണ്ട്' : 'in kitchen') : ''].filter(Boolean).join(' · ')}
-                                    </span>
-                                  ) : null}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      }
-                      if (b.type === 'steps') {
-                        return <StepTimeline key={bi} steps={b.steps} title={b.title} estimate={b.isRecipe} />;
-                      }
-                      return (
-                        <div key={bi} className="agentic-p">
-                          <InlineMarkdown text={b.text} />
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <AiReplyBody
+                    text={m.text}
+                    lang={lang}
+                    hasRecipeAction={recipeActions.length > 0}
+                    missingNames={groceryActions.map((g) => g.title)}
+                  />
                 )}
 
                 {/* Proposed Action Card */}

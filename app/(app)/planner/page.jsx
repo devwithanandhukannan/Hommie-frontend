@@ -6,9 +6,10 @@ import { Tabs, Spinner } from '@/components/ui';
 import TasksPage from '../tasks/page';
 import GroceryPage from '../grocery/page';
 import MealsPage from '../meals/page';
+import RecipesPage from '../recipes/page';
 import CalendarPage from '../calendar/page';
 
-const TABS = ['tasks', 'grocery', 'meals', 'calendar'];
+const TABS = ['tasks', 'grocery', 'meals', 'recipes', 'calendar'];
 
 function PlannerContent() {
   const { t } = useAuth();
@@ -33,6 +34,7 @@ function PlannerContent() {
         {tab === 'tasks' ? <TasksPage /> : null}
         {tab === 'grocery' ? <GroceryPage /> : null}
         {tab === 'meals' ? <MealsPage /> : null}
+        {tab === 'recipes' ? <RecipesPage /> : null}
         {tab === 'calendar' ? <CalendarPage embedded /> : null}
       </div>
     </div>

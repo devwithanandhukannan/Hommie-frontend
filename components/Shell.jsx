@@ -17,6 +17,7 @@ const MAIN_NAV = [
 ];
 
 const MORE_NAV = [
+  ['/recipes', 'nav.recipes', 'recipes'],
   ['/medicine', 'nav.medicine', 'med'],
   ['/documents', 'nav.documents', 'docs'],
   ['/special-days', 'nav.days', 'days'],

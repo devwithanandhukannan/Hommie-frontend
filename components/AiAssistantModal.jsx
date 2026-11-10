@@ -1,20 +1,24 @@
 'use client';
 import { useState, useCallback, useId } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth, notifyChanged } from '@/lib/auth';
 import { post, upload } from '@/lib/api';
 import { useVoiceInput } from '@/lib/useVoiceInput';
 import { sanitizeAiActions, actionIconName } from '@/lib/aiActions';
 import { Sheet, Btn, Icon, Spinner, formatErrorMessage } from '@/components/ui';
+import StepTimeline, { AiReplyBody, parseAiReply } from '@/components/StepTimeline';
 
 export default function AiAssistantModal({ onClose, onDone }) {
   const { lang, reloadFamily } = useAuth();
-  const [step, setStep] = useState('idle'); // 'idle' | 'analyzing' | 'review' | 'success' | 'error'
+  const router = useRouter();
+  const [step, setStep] = useState('idle'); // 'idle' | 'analyzing' | 'review' | 'success'
   const [errorMsg, setErrorMsg] = useState('');
   const [typedText, setTypedText] = useState('');
 
   const [analysis, setAnalysis] = useState(null);
   const [selectedActions, setSelectedActions] = useState([]);
   const [applying, setApplying] = useState(false);
+  const [savedSummary, setSavedSummary] = useState({ hasRecipe: false, hasGrocery: false });
 
   const inputId = useId();
 
@@ -86,7 +90,12 @@ export default function AiAssistantModal({ onClose, onDone }) {
     setErrorMsg('');
     try {
       const cleanedActions = sanitizeAiActions(selectedActions);
-      await post('/ai/apply', { actions: cleanedActions, notifyInChat: true });
+      const res = await post('/ai/apply', { actions: cleanedActions, notifyInChat: true });
+      const items = Array.isArray(res?.items) ? res.items : [];
+      setSavedSummary({
+        hasRecipe: items.some((x) => x.type === 'recipe') || cleanedActions.some((a) => a.type?.includes('recipe')),
+        hasGrocery: items.some((x) => x.type === 'grocery') || cleanedActions.some((a) => a.type?.includes('grocery')),
+      });
       setStep('success');
       notifyChanged();
       reloadFamily().catch(() => {});
@@ -262,11 +271,13 @@ export default function AiAssistantModal({ onClose, onDone }) {
             ) : null}
 
             {analysis.summary ? (
-              <div className="ai-summary-text" style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                <span style={{ marginTop: 2, flexShrink: 0 }}>
-                  <Icon name="sparkles" size={16} />
-                </span>
-                <span style={{ flex: 1 }}>{analysis.summary}</span>
+              <div className="ai-reply-card">
+                <AiReplyBody
+                  text={analysis.summary}
+                  lang={lang}
+                  hasRecipeAction={recipeActions.length > 0}
+                  missingNames={groceryActions.map((g) => g.title)}
+                />
               </div>
             ) : null}
 
@@ -282,27 +293,44 @@ export default function AiAssistantModal({ onClose, onDone }) {
                     <div className="col" style={{ gap: 8 }}>
                       {recipeActions.map((act, idx) => {
                         const isSelected = selectedActions.includes(act);
+                        const hasInlineSteps = Boolean(
+                          analysis.summary &&
+                            parseAiReply(analysis.summary, { hasRecipeAction: true }).some((b) => b.type === 'steps')
+                        );
                         return (
-                          <div
-                            key={`recipe-${idx}`}
-                            className={`ai-chip-item ${!isSelected ? 'deselected' : ''}`}
-                            onClick={() => toggleAction(act)}
-                            style={{ background: 'var(--bg-subtle, rgba(11, 107, 93, 0.08))', borderColor: 'var(--brand)' }}
-                          >
-                            <input
-                              type="checkbox"
-                              className="ai-chip-checkbox"
-                              checked={isSelected}
-                              onChange={() => {}}
-                              aria-label={act.title}
-                            />
-                            <span className="ai-chip-icon">{renderActionIcon('recipe')}</span>
-                            <span className="ai-chip-title" style={{ fontWeight: 600 }}>
-                              {act.title}
-                            </span>
-                            <span className="ai-chip-tag" style={{ background: 'var(--brand)', color: '#fff' }}>
-                              {lang === 'ml' ? 'പാചകക്കുറിപ്പ്' : 'Recipe'}
-                            </span>
+                          <div key={`recipe-${idx}`} className="col" style={{ gap: 6 }}>
+                            <div
+                              className={`ai-chip-item ${!isSelected ? 'deselected' : ''}`}
+                              onClick={() => toggleAction(act)}
+                            >
+                              <input
+                                type="checkbox"
+                                className="ai-chip-checkbox"
+                                checked={isSelected}
+                                onChange={() => {}}
+                                aria-label={act.title}
+                              />
+                              <span className="ai-chip-icon">{renderActionIcon('recipe')}</span>
+                              <span className="ai-chip-title" style={{ fontWeight: 600 }}>
+                                {act.title}
+                                {act.ingredients?.length || act.steps?.length ? (
+                                  <span className="small muted" style={{ fontWeight: 400, marginLeft: 6 }}>
+                                    {[
+                                      act.ingredients?.length ? `${act.ingredients.length} ${lang === 'ml' ? 'ചേരുവകൾ' : 'ingredients'}` : '',
+                                      act.steps?.length ? `${act.steps.length} ${lang === 'ml' ? 'ഘട്ടങ്ങൾ' : 'steps'}` : '',
+                                    ].filter(Boolean).join(' · ')}
+                                  </span>
+                                ) : null}
+                              </span>
+                              <span className="ai-chip-tag">
+                                {lang === 'ml' ? 'പാചകക്കുറിപ്പ്' : 'Recipe'}
+                              </span>
+                            </div>
+                            {!hasInlineSteps && act.steps?.length ? (
+                              <div className="ai-act-steps-box">
+                                <StepTimeline steps={act.steps} title={lang === 'ml' ? 'തയ്യാറാക്കുന്ന വിധം' : 'Steps'} estimate />
+                              </div>
+                            ) : null}
                           </div>
                         );
                       })}
@@ -488,11 +516,33 @@ export default function AiAssistantModal({ onClose, onDone }) {
               {lang === 'ml' ? 'Hommi-ലേക്ക് ചേർത്തു!' : 'Added to Hommi!'}
             </div>
             <div className="muted small" style={{ marginTop: 4, marginBottom: 20 }}>
-              {lang === 'ml' ? 'കുടുംബാംഗങ്ങൾക്കെല്ലാം കാണാവുന്നതാണ്.' : 'All items are now added to your family lists.'}
+              {savedSummary.hasRecipe
+                ? lang === 'ml'
+                  ? 'പാചകക്കുറിപ്പും ലിസ്റ്റുകളും കുടുംബത്തിനായി സേവ് ചെയ്തു.'
+                  : 'Saved to your family Recipes & lists.'
+                : lang === 'ml'
+                ? 'കുടുംബാംഗങ്ങൾക്കെല്ലാം കാണാവുന്നതാണ്.'
+                : 'All items are now added to your family lists.'}
             </div>
-            <Btn onClick={onClose} style={{ width: '100%' }}>
-              {lang === 'ml' ? 'ശരി' : 'Done'}
-            </Btn>
+            <div className="row" style={{ gap: 10 }}>
+              {savedSummary.hasRecipe || savedSummary.hasGrocery ? (
+                <Btn
+                  tone="ghost"
+                  className="grow"
+                  onClick={() => {
+                    onClose();
+                    router.push(savedSummary.hasRecipe ? '/planner?tab=recipes' : '/planner?tab=grocery');
+                  }}
+                >
+                  {savedSummary.hasRecipe
+                    ? lang === 'ml' ? 'പാചകക്കുറിപ്പ് കാണുക' : 'View Recipes'
+                    : lang === 'ml' ? 'ലിസ്റ്റ് കാണുക' : 'View Grocery'}
+                </Btn>
+              ) : null}
+              <Btn onClick={onClose} className="grow">
+                {lang === 'ml' ? 'ശരി' : 'Done'}
+              </Btn>
+            </div>
           </div>
         ) : null}
       </div>

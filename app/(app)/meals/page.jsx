@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { put, post, del } from '@/lib/api';
 import { useAuth, useData } from '@/lib/auth';
@@ -60,6 +61,7 @@ export default function MealsPage() {
         <Btn tone="ghost" size="sm" onClick={() => setStart(addDaysStr(start, -7))}>{t('meals.prev_week')}</Btn>
         <Btn tone="ghost" size="sm" onClick={() => setStart(today)}>{t('meals.this_week')}</Btn>
         <Btn tone="ghost" size="sm" onClick={() => setStart(addDaysStr(start, 7))}>{t('meals.next_week')}</Btn>
+        <Link href="/recipes" className="btn ghost sm">{t('nav.recipes')}</Link>
       </PageHeader>
       {loading && !data ? <Spinner /> : error ? <ErrorNote error={error} /> : (
         <div className="meal-tl">

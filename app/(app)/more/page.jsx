@@ -27,6 +27,7 @@ export default function More() {
       <h1 className="today-hello">{t('more.title')}</h1>
       <p className="today-sentence">{family?.name} · {user?.name}</p>
       <div className="acc">
+        <Row href="/recipes" icon="recipes" title={t('nav.recipes')} sub={t('recipes.sub')} />
         <Row href="/medicine" icon="med" title={t('nav.medicine')} sub={t('more.sub_med')} />
         <Row href="/documents" icon="docs" title={t('nav.documents')} sub={t('more.sub_docs')} />
         <Row href="/special-days" icon="days" title={t('nav.days')} sub={t('more.sub_days')} />
