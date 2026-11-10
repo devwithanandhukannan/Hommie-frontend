@@ -480,7 +480,7 @@ export default function CalendarPage({ embedded = false }) {
   const [viewMode, setViewMode] = useState('list'); // 'month' | 'list' (opens on what is coming up)
   const [modal, setModal] = useState(null);
 
-  const { data, loading, error, reload } = useData(`/calendar?month=${curMonth}`, { interval: 60000 });
+  const { data, loading, error, reload } = useData(`/calendar?month=${curMonth}`, { interval: 180000 });
   const [run] = useAction();
 
   const [year, monthNum] = curMonth.split('-').map(Number);

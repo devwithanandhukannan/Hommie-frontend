@@ -174,7 +174,7 @@ function NewBill({ onClose, onDone }) {
 
 function Instances({ status }) {
   const { family, me, t, lang } = useAuth();
-  const { data, error, loading, reload } = useData(`/bill-instances?status=${status}`, { interval: 30000 });
+  const { data, error, loading, reload } = useData(`/bill-instances?status=${status}`, { interval: 120000 });
   const [run] = useAction();
   const [amountFor, setAmountFor] = useState(null);
   if (loading && !data) return <Spinner />;

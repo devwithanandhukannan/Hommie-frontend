@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth, useData } from '@/lib/auth';
+import { useServerStatus } from '@/lib/serverStatus';
 import { Icon, Sheet, Btn, Badge } from '@/components/ui';
 import { applyTheme, getSavedTheme } from '@/lib/theme';
 import PwaInstallPrompt from '@/components/PwaInstallPrompt';
@@ -69,11 +70,12 @@ function FamilySwitcher({ onClose }) {
 
 export default function Shell({ children }) {
   const { family, families, familyId, t, user, savedView } = useAuth();
+  const { isWakingUp } = useServerStatus();
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const router = useRouter();
-  const notes = useData('/me/notifications', { interval: 60000 });
+  const notes = useData('/me/notifications', { interval: 180000 });
   const unread = notes.data?.unread || 0;
   const chatUnread = families.find((f) => f.id === familyId)?.unreadChat || 0;
   const isTabActive = (href) => {
@@ -226,6 +228,7 @@ export default function Shell({ children }) {
               {profile}
             </div>
           </div>
+          {isWakingUp ? <div className="saved-banner" role="status">{t('common.waking_up')}</div> : null}
           {savedView ? <div className="saved-banner" role="status">{t('common.offline_saved')}</div> : null}
           {children}
         </main>

@@ -7,7 +7,7 @@ import { shortDate } from '@/lib/format';
 export default function AllFamilies() {
   const { switchFamily } = useAuth();
   const router = useRouter();
-  const { data, error, loading } = useData('/overview', { interval: 60000 });
+  const { data, error, loading } = useData('/overview', { interval: 180000 });
   const go = async (id, to) => { await switchFamily(id); router.push(to); };
   if (loading && !data) return <Spinner />;
   if (error) return <ErrorNote error={error} />;

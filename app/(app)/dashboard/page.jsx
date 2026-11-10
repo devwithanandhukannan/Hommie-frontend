@@ -95,8 +95,8 @@ function DayTimeline({ day, today, t }) {
 
 export default function Today() {
   const { t, family, user, lang } = useAuth();
-  const { data: d, error, loading, reload } = useData('/dashboard', { interval: 60000 });
-  const { data: doneTasks } = useData('/tasks?scope=done', { interval: 60000 });
+  const { data: d, error, loading, reload } = useData('/dashboard', { interval: 180000 });
+  const doneTasks = d?.doneTodayTasks || [];
   const [run] = useAction();
   const [amountFor, setAmountFor] = useState(null);
   const [expanded, setExpanded] = useState(false);

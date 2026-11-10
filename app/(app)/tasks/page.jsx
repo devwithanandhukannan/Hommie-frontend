@@ -92,7 +92,7 @@ export default function TasksPage() {
   const searchParams = useSearchParams();
   const urlScope = searchParams?.get('scope') || searchParams?.get('tab');
   const [scope, setScope] = useState(urlScope === 'done' || urlScope === 'mine' ? urlScope : 'open');
-  const { data, error, loading, reload } = useData(`/tasks?scope=${scope}`, { interval: 30000 });
+  const { data, error, loading, reload } = useData(`/tasks?scope=${scope}`, { interval: 120000 });
   const [run] = useAction();
   const confirm = useConfirm();
   const [adding, setAdding] = useState(false);

@@ -71,7 +71,7 @@ function ItemSheet({ item, onClose, onDone }) {
 export default function Grocery() {
   const { t } = useAuth();
   const toast = useToast();
-  const { data, error, loading, reload, setData } = useData('/grocery', { interval: 20000 });
+  const { data, error, loading, reload, setData } = useData('/grocery', { interval: 120000 });
   const [run] = useAction();
   const [text, setText] = useState('');
   const [edit, setEdit] = useState(null);

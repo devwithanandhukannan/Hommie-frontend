@@ -51,7 +51,7 @@ function MedForm({ onClose, onDone }) {
 
 function Today() {
   const { t } = useAuth();
-  const { data, error, loading, reload } = useData('/medicines/today', { interval: 60000 });
+  const { data, error, loading, reload } = useData('/medicines/today', { interval: 180000 });
   const [run] = useAction();
   const log = (d, status) => run(async () => { await post(`/medicines/${d.medicineId}/logs`, { time: d.time, status }); reload(); }, status === 'given' ? 'Recorded' : 'Skipped');
   if (loading && !data) return <Spinner />;

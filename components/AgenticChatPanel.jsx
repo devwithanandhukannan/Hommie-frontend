@@ -9,19 +9,33 @@ import { Icon, Spinner, formatErrorMessage } from '@/components/ui';
 import { AiReplyBody, parseAiReply } from '@/components/StepTimeline';
 import { hhmm } from '@/lib/format';
 
+const WELCOME_COPY = {
+  en: {
+    text: 'Hello! I am your Hommi AI assistant. Ask me what fast meal you can cook from your kitchen groceries, detailed step-by-step recipes, pending chores, or this month’s family expenses.',
+    suggestedChips: ['What can I cook fast?', 'What to buy?', 'Make Biriyani (check kitchen)', 'Monthly expenses', 'Today’s medicines'],
+  },
+  ml: {
+    text: 'നമസ്കാരം! ഞാൻ നിങ്ങളുടെ Hommi AI സഹായിയാണ്. അടുക്കളയിലെ സാധനങ്ങൾ വെച്ച് പെട്ടെന്ന് എന്ത് ഉണ്ടാക്കാം എന്നും, ബിരിയാണി പോലുള്ള വിഭവങ്ങളുടെ മുഴുവൻ റെസിപ്പിയും സാധനങ്ങളുടെ ലിസ്റ്റും, ജോലികളും, ഈ മാസത്തെ ചിലവും എന്നോട് ചോദിക്കാം.',
+    suggestedChips: ['അടുക്കളയിലെ സാധനങ്ങൾ വെച്ച് പെട്ടെന്ന് എന്ത് ഉണ്ടാക്കാം?', 'എന്തൊക്കെ വാങ്ങാനുണ്ട്?', 'ബിരിയാണി ഉണ്ടാക്കാൻ എന്ത് വേണം?', 'ഈ മാസത്തെ ചിലവ് എത്ര?', 'ഇന്നത്തെ മരുന്നുകൾ'],
+  },
+  ta: {
+    text: 'வணக்கம்! நான் உங்கள் Hommi AI உதவியாளர். சமையலறை பொருட்களை வைத்து விரைவாக என்ன சமைக்கலாம், விரிவான சமையல் குறிப்புகள், மளிகைப் பட்டியல், நிலுவையில் உள்ள பணிகள் அல்லது இந்த மாத செலவுகள் பற்றி கேட்கலாம்.',
+    suggestedChips: ['உடனே என்ன சமைக்கலாம்?', 'என்ன வாங்க வேண்டும்?', 'பிரியாணி செய்ய என்ன வேண்டும்?', 'மாதச் செலவு எவ்வளவு?', 'இன்றைய மருந்துகள்'],
+  },
+  hi: {
+    text: 'नमस्ते! मैं आपका Hommi AI सहायक हूँ। रसोई में मौजूद सामान से झटपट क्या बना सकते हैं, पूरी रेसिपी, किराना सूची, बाकी काम या इस महीने का खर्च मुझसे पूछें।',
+    suggestedChips: ['जल्दी क्या बना सकते हैं?', 'क्या खरीदना बाकी है?', 'बिरयानी बनाने के लिए क्या चाहिए?', 'इस महीने का खर्च', 'आज की दवाइयाँ'],
+  },
+};
+
 function buildWelcomeMessage(lang) {
+  const copy = WELCOME_COPY[lang] || WELCOME_COPY.en;
   return {
     id: 'welcome',
     role: 'assistant',
-    text:
-      lang === 'ml'
-        ? 'നമസ്കാരം! ഞാൻ നിങ്ങളുടെ Hommi AI സഹായിയാണ്. അടുക്കളയിലെ സാധനങ്ങൾ വെച്ച് പെട്ടെന്ന് എന്ത് ഉണ്ടാക്കാം എന്നും, ബിരിയാണി പോലുള്ള വിഭവങ്ങളുടെ മുഴുവൻ റെസിപ്പിയും സാധനങ്ങളുടെ ലിസ്റ്റും, ജോലികളും, ഈ മാസത്തെ ചിലവും എന്നോട് ചോദിക്കാം.'
-        : 'Hello! I am your Hommi AI assistant. Ask me what fast meal you can cook from your kitchen groceries, detailed step-by-step recipes, pending chores, or this month’s family expenses.',
+    text: copy.text,
     actions: [],
-    suggestedChips:
-      lang === 'ml'
-        ? ['അടുക്കളയിലെ സാധനങ്ങൾ വെച്ച് പെട്ടെന്ന് എന്ത് ഉണ്ടാക്കാം?', 'എന്തൊക്കെ വാങ്ങാനുണ്ട്?', 'ബിരിയാണി ഉണ്ടാക്കാൻ എന്ത് വേണം?', 'ഈ മാസത്തെ ചിലവ് എത്ര?', 'ഇന്നത്തെ മരുന്നുകൾ']
-        : ['What can I cook fast?', 'What to buy?', 'Make Biriyani (check kitchen)', 'Monthly expenses', 'Today’s medicines'],
+    suggestedChips: copy.suggestedChips,
   };
 }
 

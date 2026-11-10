@@ -1,7 +1,7 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api, get, post, setAccessToken, setActiveFamily, setSessionLostHandler, refreshSession, clearPrivateCaches } from '@/lib/api';
+import { api, get, post, getAuthHeaders, setAccessToken, setActiveFamily, setSessionLostHandler, refreshSession, clearPrivateCaches } from '@/lib/api';
 import { translate, translateNotificationText } from '@/lib/i18n';
 
 const Ctx = createContext(null);
@@ -78,11 +78,16 @@ export function AuthProvider({ children }) {
     setAccessToken(null); setActiveFamily(null);
     store.del('fh_family');
     clearPrivateCaches();
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('hommi:clear-blobs'));
     setUser(null); setFamily(null); setFamilies([]); setStatus('anon');
     router.replace('/login');
   }, [router]);
 
-  const switchFamily = useCallback(async (id) => { await loadFamily(id); await loadOverview(); }, [loadFamily, loadOverview]);
+  const switchFamily = useCallback(async (id) => {
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('hommi:clear-blobs'));
+    await loadFamily(id);
+    await loadOverview();
+  }, [loadFamily, loadOverview]);
   const reloadFamily = useCallback(async () => { if (familyIdRef.current) { await loadFamily(familyIdRef.current); await loadOverview(); } }, [loadFamily, loadOverview]);
 
   const [langState, setLangState] = useState(() => store.get('fh_lang') || 'en');
@@ -94,6 +99,80 @@ export function AuthProvider({ children }) {
   }, [user?.language]);
 
   useEffect(() => { if (typeof document !== 'undefined') document.documentElement.lang = langState; }, [langState]);
+
+  // Real-time SSE stream for instant chat, notification, and family list updates.
+  useEffect(() => {
+    if (status !== 'authed' || typeof window === 'undefined') return;
+    let aborted = false;
+    let ctrl = null;
+    let retryTimer = null;
+    let backoffMs = 1500;
+    const famId = family?.id || null;
+
+    const handlePayload = (detail) => {
+      window.dispatchEvent(new CustomEvent('hommi:sse', { detail }));
+      if (detail?.kind === 'notification') {
+        window.dispatchEvent(new Event('hommi:notif'));
+      } else if (detail?.kind === 'chat') {
+        loadOverview().catch(() => {});
+      } else if (detail?.kind) {
+        notifyChanged();
+      }
+    };
+
+    const connect = async () => {
+      if (aborted) return;
+      ctrl = new AbortController();
+      try {
+        let headers = getAuthHeaders();
+        let res = await fetch('/api/events', { headers, credentials: 'same-origin', cache: 'no-store', signal: ctrl.signal });
+        if (res.status === 401) {
+          const renewed = await refreshSession();
+          if (!renewed || renewed === 'offline' || aborted) throw new Error('auth');
+          headers = getAuthHeaders();
+          res = await fetch('/api/events', { headers, credentials: 'same-origin', cache: 'no-store', signal: ctrl.signal });
+        }
+        if (!res.ok || !res.body) throw new Error(`sse ${res.status}`);
+        backoffMs = 1500;
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        while (!aborted) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const frames = buf.split('\n\n');
+          buf = frames.pop() || '';
+          for (const frame of frames) {
+            if (!frame || frame.startsWith(':')) continue;
+            let eventName = 'message';
+            let dataLine = '';
+            for (const line of frame.split('\n')) {
+              if (line.startsWith('event:')) eventName = line.slice(6).trim();
+              else if (line.startsWith('data:')) dataLine += line.slice(5).trim();
+            }
+            if (eventName === 'update' && dataLine) {
+              try { handlePayload(JSON.parse(dataLine)); } catch {}
+            }
+          }
+        }
+      } catch {
+        // Reconnect with bounded backoff unless unmounted.
+      }
+      if (!aborted) {
+        retryTimer = setTimeout(connect, backoffMs);
+        backoffMs = Math.min(30000, backoffMs * 2);
+      }
+    };
+
+    connect();
+    return () => {
+      aborted = true;
+      clearTimeout(retryTimer);
+      try { ctrl?.abort(); } catch {}
+    };
+  }, [status, family?.id, loadOverview]);
 
   const setLang = useCallback((l) => {
     store.set('fh_lang', l);
@@ -118,38 +197,58 @@ export function AuthProvider({ children }) {
 /** Anything that changes shared data calls notifyChanged(); every visible list then refreshes itself. */
 export const notifyChanged = () => { if (typeof window !== 'undefined') window.dispatchEvent(new Event('hommi:changed')); };
 
+/** Deduplicates simultaneous identical GET calls across mounted components. */
+const inflightGets = new Map();
+function sharedGet(familyId, path) {
+  const key = `${familyId || 'global'}:${path}`;
+  let p = inflightGets.get(key);
+  if (!p) {
+    p = api('GET', path).finally(() => inflightGets.delete(key));
+    inflightGets.set(key, p);
+  }
+  return p;
+}
+
 export function useData(path, { interval = 0, deps = [] } = {}) {
   const { familyId } = useAuth();
   const [state, setState] = useState({ data: null, error: null, loading: true });
   const alive = useRef(true);
   const seq = useRef(0);
+  const lastLoadedAt = useRef(0);
   const load = useCallback(async (quiet) => {
     if (!path) return;
     const mine = ++seq.current; // ignore answers that arrive after a newer request was started
     if (!quiet) setState((s) => ({ ...s, loading: true }));
     try {
-      const data = await api('GET', path);
+      const data = await sharedGet(familyId, path);
+      lastLoadedAt.current = Date.now();
       if (alive.current && mine === seq.current) setState({ data, error: null, loading: false });
     } catch (e) {
       if (alive.current && mine === seq.current) setState((s) => ({ data: quiet ? s.data : null, error: e, loading: false }));
     }
-  }, [path]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [path, familyId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     alive.current = true;
     load(false);
     let timer;
     if (interval) timer = setInterval(() => { if (document.visibilityState === 'visible') load(true); }, interval);
     const refresh = () => { if (document.visibilityState === 'visible') load(true); };
+    const focusRefresh = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastLoadedAt.current > 5000) load(true);
+    };
+    const isNotifPath = path.startsWith('/me/notifications');
     window.addEventListener('hommi:changed', refresh);
-    window.addEventListener('online', refresh);
-    document.addEventListener('visibilitychange', refresh);
+    if (isNotifPath) window.addEventListener('hommi:notif', refresh);
+    window.addEventListener('online', focusRefresh);
+    document.addEventListener('visibilitychange', focusRefresh);
     return () => {
       alive.current = false; clearInterval(timer);
       window.removeEventListener('hommi:changed', refresh);
-      window.removeEventListener('online', refresh);
-      document.removeEventListener('visibilitychange', refresh);
+      if (isNotifPath) window.removeEventListener('hommi:notif', refresh);
+      window.removeEventListener('online', focusRefresh);
+      document.removeEventListener('visibilitychange', focusRefresh);
     };
-  }, [load, familyId, interval, ...deps]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [load, familyId, interval, path, ...deps]); // eslint-disable-line react-hooks/exhaustive-deps
   return {
     ...state,
     reload: () => load(true),

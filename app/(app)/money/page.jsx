@@ -423,7 +423,7 @@ function MoneyContent() {
   const { t } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
-  const grocery = useData('/grocery', { interval: 30000 });
+  const grocery = useData('/grocery', { interval: 120000 });
   const unbilled = (grocery.data || []).filter((g) => g.unbilled);
   const [tab, setTab] = useState(TABS.includes(params.get('tab')) ? params.get('tab') : 'expenses');
   useEffect(() => { const q = params.get('tab'); if (TABS.includes(q)) setTab(q); }, [params]);

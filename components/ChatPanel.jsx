@@ -47,15 +47,58 @@ function getSystemMessageInfo(m) {
   return kind;
 }
 
-function ChatImage({ id }) {
-  const [src, setSrc] = useState(null);
+const blobUrlCache = new Map();
+const blobInflight = new Map();
+const MAX_BLOB_CACHE = 60;
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('hommi:clear-blobs', () => {
+    for (const url of blobUrlCache.values()) {
+      try { URL.revokeObjectURL(url); } catch {}
+    }
+    blobUrlCache.clear();
+  });
+}
+
+function fetchCachedBlobUrl(id) {
+  const key = String(id);
+  const hit = blobUrlCache.get(key);
+  if (hit) {
+    blobUrlCache.delete(key);
+    blobUrlCache.set(key, hit);
+    return Promise.resolve(hit);
+  }
+  let p = blobInflight.get(key);
+  if (!p) {
+    p = getBlob(`/attachments/${key}`).then((b) => {
+      const url = URL.createObjectURL(b);
+      if (blobUrlCache.size >= MAX_BLOB_CACHE) {
+        const oldestKey = blobUrlCache.keys().next().value;
+        const oldestUrl = oldestKey ? blobUrlCache.get(oldestKey) : null;
+        if (oldestKey) blobUrlCache.delete(oldestKey);
+        if (oldestUrl) { try { URL.revokeObjectURL(oldestUrl); } catch {} }
+      }
+      blobUrlCache.set(key, url);
+      return url;
+    }).finally(() => blobInflight.delete(key));
+    blobInflight.set(key, p);
+  }
+  return p;
+}
+
+function useCachedAttachment(id) {
+  const [src, setSrc] = useState(() => (id ? blobUrlCache.get(String(id)) || null : null));
   useEffect(() => {
-    let url; let alive = true;
-    getBlob(`/attachments/${id}`).then((b) => {
-      if (alive) { url = URL.createObjectURL(b); setSrc(url); }
-    }).catch(() => {});
-    return () => { alive = false; if (url) URL.revokeObjectURL(url); };
+    if (!id) return;
+    let alive = true;
+    fetchCachedBlobUrl(id).then((url) => { if (alive) setSrc(url); }).catch(() => {});
+    return () => { alive = false; };
   }, [id]);
+  return src;
+}
+
+function ChatImage({ id }) {
+  const src = useCachedAttachment(id);
   return src ? (
     <img className="chat-img" src={src} alt="Shared in chat" />
   ) : (
@@ -64,19 +107,11 @@ function ChatImage({ id }) {
 }
 
 function ChatAudio({ id, duration, isMe }) {
-  const [src, setSrc] = useState(null);
+  const src = useCachedAttachment(id);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const audioRef = useRef(null);
-
-  useEffect(() => {
-    let url; let alive = true;
-    getBlob(`/attachments/${id}`).then((b) => {
-      if (alive) { url = URL.createObjectURL(b); setSrc(url); }
-    }).catch(() => {});
-    return () => { alive = false; if (url) URL.revokeObjectURL(url); };
-  }, [id]);
 
   const toggle = () => {
     if (!audioRef.current) return;
@@ -465,7 +500,7 @@ export default function ChatPanel({ compact = false }) {
       })
       .catch(() => alive && setItems([]));
 
-    const timer = setInterval(async () => {
+    const fetchLatest = async () => {
       if (document.visibilityState !== 'visible' || !alive) return;
       try {
         const q = lastId.current ? `?after=${lastId.current}` : '?limit=40';
@@ -482,9 +517,17 @@ export default function ChatPanel({ compact = false }) {
       } catch {
         /* offline */
       }
-    }, 4000);
+    };
+
+    const onSse = (e) => {
+      const kind = e.detail?.kind;
+      if (kind === 'chat' || kind === 'family') fetchLatest();
+    };
+    window.addEventListener('hommi:sse', onSse);
+    const timer = setInterval(fetchLatest, 25000);
     return () => {
       alive = false;
+      window.removeEventListener('hommi:sse', onSse);
       clearInterval(timer);
     };
   }, [familyId, markRead]);
