@@ -2,17 +2,22 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { onServerStatusChange } from '@/lib/api';
 
-const ServerStatusContext = createContext({ isWakingUp: false });
+const ServerStatusContext = createContext({ isWakingUp: false, isBooting: false });
 
 export function ServerStatusProvider({ children }) {
-  const [isWakingUp, setIsWakingUp] = useState(false);
+  const [status, setStatus] = useState({ isWakingUp: false, isBooting: false });
 
   useEffect(() => {
-    return onServerStatusChange((state) => setIsWakingUp(Boolean(state?.isWakingUp)));
+    return onServerStatusChange((next) => {
+      setStatus({
+        isWakingUp: Boolean(next?.isWakingUp),
+        isBooting: Boolean(next?.isBooting),
+      });
+    });
   }, []);
 
   return (
-    <ServerStatusContext.Provider value={{ isWakingUp }}>
+    <ServerStatusContext.Provider value={status}>
       {children}
     </ServerStatusContext.Provider>
   );

@@ -3341,6 +3341,21 @@ body { overscroll-behavior-y: none; }
 .amount-field input { flex: 1; min-width: 0; border: 0; background: none; outline: 0; font-size: 34px; font-weight: 800; color: var(--text); padding: 8px 0; }
 
 .offline-screen { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; }
+.boot-screen { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; }
+.boot-inline { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px 12px; text-align: center; }
+.boot-screen h1, .boot-inline h2 { margin: 4px 0 0; font-size: 20px; line-height: 1.25; }
+.boot-screen p, .boot-inline p { margin: 0; max-width: 340px; line-height: 1.5; }
+.boot-spinner {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--brand) 22%, var(--line));
+  border-top-color: var(--brand);
+  animation: bootSpin 0.85s linear infinite;
+}
+.boot-spinner-sm { width: 16px; height: 16px; border-width: 2px; flex-shrink: 0; }
+@keyframes bootSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .boot-spinner { animation: none; } }
 
 /* Today: a calm stream, not a dashboard */
 .today-hello { margin: 4px 0 2px; font-size: 28px; line-height: 1.15; letter-spacing: -0.02em; }

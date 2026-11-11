@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { useServerStatus } from '@/lib/serverStatus';
+import { SystemBootScreen } from '@/components/ui';
 import { afterAuthPath } from '@/lib/joinFlow';
 
 const LANGS = [['en', 'EN'], ['ml', 'മല'], ['hi', 'हि'], ['ta', 'த']];
@@ -17,8 +19,12 @@ const IconCare = () => <Line><path d="M22 36S8 28 8 18a7 7 0 0 1 14-2 7 7 0 0 1 
 
 export default function Landing() {
   const { status, families, t, lang, setLang } = useAuth();
+  const { isBooting, isWakingUp } = useServerStatus();
   const router = useRouter();
   useEffect(() => { if (status === 'authed') router.replace(afterAuthPath(families)); }, [status, families, router]);
+  if (status === 'loading' && (isBooting || isWakingUp)) {
+    return <SystemBootScreen title={t('common.booting_title')} sub={t('common.booting_sub')} />;
+  }
 
   const cards = [['01', t('land.plan'), t('land.p1'), <IconPlan key="a" />], ['02', t('land.share'), t('land.p2'), <IconShare key="b" />], ['03', t('land.care'), t('land.p3'), <IconCare key="c" />]];
 

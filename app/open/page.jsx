@@ -2,11 +2,13 @@
 import { Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { Spinner } from '@/components/ui';
+import { useServerStatus } from '@/lib/serverStatus';
+import { Spinner, SystemBootScreen } from '@/components/ui';
 
 // Deep link used by push notifications: switch to the right family, then open the target page.
 function Open() {
-  const { status, families, switchFamily } = useAuth();
+  const { status, families, switchFamily, t } = useAuth();
+  const { isBooting, isWakingUp } = useServerStatus();
   const router = useRouter();
   const params = useSearchParams();
   useEffect(() => {
@@ -20,6 +22,9 @@ function Open() {
       router.replace(safe);
     })();
   }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (status === 'loading' && (isBooting || isWakingUp)) {
+    return <SystemBootScreen title={t('common.booting_title')} sub={t('common.booting_sub')} />;
+  }
   return <Spinner />;
 }
 export default function Page() { return <Suspense fallback={<Spinner />}><Open /></Suspense>; }

@@ -70,7 +70,7 @@ function FamilySwitcher({ onClose }) {
 
 export default function Shell({ children }) {
   const { family, families, familyId, t, user, savedView } = useAuth();
-  const { isWakingUp } = useServerStatus();
+  const { isWakingUp, isBooting } = useServerStatus();
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -228,7 +228,12 @@ export default function Shell({ children }) {
               {profile}
             </div>
           </div>
-          {isWakingUp ? <div className="saved-banner" role="status">{t('common.waking_up')}</div> : null}
+          {isWakingUp || isBooting ? (
+            <div className="saved-banner row" style={{ gap: 10 }} role="status" aria-live="polite">
+              <span className="boot-spinner boot-spinner-sm" aria-hidden="true" />
+              <span>{isBooting ? t('common.booting_title') : t('common.waking_up')}</span>
+            </div>
+          ) : null}
           {savedView ? <div className="saved-banner" role="status">{t('common.offline_saved')}</div> : null}
           {children}
         </main>

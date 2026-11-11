@@ -114,6 +114,20 @@ export function Spinner({ size, cards = 2, rows = 4 }) {
   }
   return <PageSkeleton cards={cards} rows={rows} />;
 }
+
+export function SystemBootScreen({ inline = false, title, sub }) {
+  const lang = getAppLang();
+  const heading = title || translate(lang, 'common.booting_title');
+  const subtitle = sub || translate(lang, 'common.booting_sub');
+  return (
+    <div className={inline ? 'boot-inline' : 'boot-screen'} role="status" aria-live="polite" aria-busy="true">
+      {!inline ? <img src="/icon-192.png" alt="Hommi" width="60" height="60" style={{ borderRadius: 16 }} /> : null}
+      <div className="boot-spinner" aria-hidden="true" />
+      {inline ? <h2>{heading}</h2> : <h1>{heading}</h1>}
+      <p className="muted small">{subtitle}</p>
+    </div>
+  );
+}
 export const ErrorNote = ({ error }) => {
   const msg = formatErrorMessage(error);
   if (!msg) return null;
